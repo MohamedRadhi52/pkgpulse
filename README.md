@@ -14,6 +14,7 @@ Prérequis : Python 3.14 et make.
 make install   # environnement virtuel, dépendances et hooks pre-commit
 make lint
 make test
+make ingest    # backfill de l'archive depuis le 2025-11-01, puis dump du jour
 ```
 
 Documentation : [cadrage](docs/cadrage.md) et [journal des décisions](docs/DECISIONS.md).

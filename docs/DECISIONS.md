@@ -75,3 +75,46 @@ chaque cas d'échec.
   avec un user-agent qui identifie le projet. Les tables d'utilisateurs et de propriétaires ne
   sont pas extraites. Seuls des agrégats (total, catégories, paquets) sont publiés ; les données
   brutes ne sont jamais versionnées dans le dépôt.
+
+## 5. Couche bronze : un fichier Parquet par jour, remplacé en bloc
+
+- Les téléchargements vont dans `data/bronze/version_downloads/AAAA-MM-JJ.parquet`, avec les
+  colonnes `date`, `version_id`, `downloads`, `source` (`archive` ou `dump`), `checksum` et
+  `extracted_at` (Last-Modified du fichier d'archive, ou horodatage du dump). Les tables de
+  métadonnées du dump sont remplacées à chaque dump (`data/bronze/crates.parquet`, etc.) ; leur
+  historique est conservé par le snapshot dbt.
+- L'unité d'écriture est le jour : une écriture remplace toute la partition, par un fichier
+  temporaire puis un renommage atomique. Relancer n'ajoute jamais de lignes, donc ne crée jamais
+  de doublon. Un arrêt brutal laisse au pire un `.tmp` orphelin, ignoré par les lecteurs, et la
+  relance reprend au premier jour manquant. Ce cas s'est produit pendant le premier backfill :
+  processus tué après 48 jours, relance qui n'a téléchargé que les 193 jours restants.
+- L'empreinte `checksum` est le MD5 des lignes du jour triées par version. Elle sert à ne pas
+  réécrire un jour inchangé, à détecter les corrections tardives et à comparer l'archive et le dump
+  sur un même jour, quelle que soit la source.
+- L'intégrité des téléchargements est vérifiée à la source : MD5 contre ETag pour l'archive, CRC du
+  gzip en fin de flux pour le dump.
+- Pas de logique de nouvelle tentative : une exécution en échec est simplement relancée, et
+  l'idempotence rend la relance sûre.
+
+Volumes réels : du 2025-11-01 au 2026-06-29, 241 fichiers d'archive, 385 000 lignes par jour en
+moyenne, 196 Mo de Parquet (0,8 Mo par jour contre 3,7 Mo en CSV).
+
+## 6. Jonction de l'archive et du dump, données tardives
+
+La règle, dans `src/pkgpulse/ingest/junction.py`, décide si une partition candidate remplace la
+partition existante du même jour :
+
+| Partition existante | Candidate | Écriture |
+|---|---|---|
+| aucune | archive ou dump | oui |
+| dump | archive | oui : l'archive est définitive |
+| archive | dump | non : le dump ne remplace jamais l'archive |
+| dump | dump au contenu différent | oui : données tardives |
+| même source, même contenu | | non |
+
+Conséquence testée : exécuter l'archive puis le dump, ou le dump puis l'archive, donne le même état.
+
+Le jour du dump n'est compté que jusqu'à l'heure du dump. Il est gardé en bronze, qui conserve le
+brut, et écarté en aval : un jour est complet si sa date est antérieure à la date de
+`extracted_at`. Le lendemain, le nouveau dump réécrit les jours dont le compte a changé, et
+l'ingestion journalise chaque correction (nombre de téléchargements avant et après).

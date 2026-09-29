@@ -7,3 +7,6 @@ __pycache__/
 
 # Correctifs appliqués avec git am
 *.patch
+
+# Données locales (couche bronze, entrepôt DuckDB)
+data/

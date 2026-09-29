@@ -1,0 +1,63 @@
+name: Pipeline quotidien
+
+# Ingestion réelle depuis static.crates.io. La couche bronze est conservée d'une exécution à
+# l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/pkgpulse/**"
+      - "requirements.txt"
+      - ".github/workflows/daily.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: make install
+
+      - name: Restaurer les données
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - name: Ingestion bronze
+        run: make ingest 2>&1 | tee ingest.log
+
+      # Les écritures sont atomiques : même après un échec, l'état est cohérent et la prochaine
+      # exécution reprend là où celle-ci s'est arrêtée.
+      - name: Sauvegarder les données
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+
+      - name: Bilan
+        if: always()
+        run: |
+          grep -h "Bilan" ingest.log | sed 's/^.*Bilan/::notice title=Ingestion::Bilan/' || true
+          if grep -q "Traceback" ingest.log; then
+            echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"
+          fi

@@ -2,7 +2,7 @@ PYTHON ?= python3
 VENV ?= .venv
 BIN := $(VENV)/bin
 
-.PHONY: install lint format test
+.PHONY: install lint format test ingest
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -19,3 +19,8 @@ format:
 
 test:
 	$(BIN)/pytest
+
+# Backfill ou rattrapage depuis l'archive, puis dump du jour.
+ingest:
+	$(BIN)/python -m pkgpulse.ingest archive
+	$(BIN)/python -m pkgpulse.ingest dump
