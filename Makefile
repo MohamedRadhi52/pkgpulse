@@ -2,7 +2,7 @@ PYTHON ?= python3
 VENV ?= .venv
 BIN := $(VENV)/bin
 
-.PHONY: install lint format
+.PHONY: install lint format test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -16,3 +16,6 @@ lint:
 format:
 	$(BIN)/ruff check --fix .
 	$(BIN)/ruff format .
+
+test:
+	$(BIN)/pytest

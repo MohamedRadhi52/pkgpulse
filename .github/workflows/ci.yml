@@ -20,3 +20,4 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: make install
       - run: make lint
+      - run: make test

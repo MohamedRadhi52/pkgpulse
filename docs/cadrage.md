@@ -73,7 +73,7 @@ L'historique commence le 1er novembre 2025. Fin octobre 2025, crates.io a restre
 aux téléchargements faits par cargo pour écarter les miroirs : le nombre de lignes quotidiennes est
 divisé par 2,5 à 4. Le total ne montre pas de rupture nette, mais la longue traîne des petits
 paquets, et donc les catégories, change de niveau. Les données antérieures relèvent d'un autre
-régime de comptage.
+régime de comptage ([DECISIONS.md](DECISIONS.md), décision 2).
 
 ## Hors périmètre
 

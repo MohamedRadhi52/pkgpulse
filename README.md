@@ -13,4 +13,7 @@ Prérequis : Python 3.14 et make.
 ```bash
 make install   # environnement virtuel, dépendances et hooks pre-commit
 make lint
+make test
 ```
+
+Documentation : [cadrage](docs/cadrage.md) et [journal des décisions](docs/DECISIONS.md).
