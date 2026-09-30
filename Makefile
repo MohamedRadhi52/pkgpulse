@@ -8,7 +8,7 @@ DBT_FLAGS := --project-dir dbt --profiles-dir dbt
 # Chemin absolu : l'ingestion et dbt lisent les mêmes données, quel que soit le dossier courant.
 export PKGPULSE_DATA_DIR = $(abspath $(DATA_DIR))
 
-.PHONY: install lint format test ingest dbt publish backtest sample check airflow-test
+.PHONY: install lint format test ingest dbt publish backtest forecast anomalies sample check airflow-test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -43,6 +43,10 @@ publish:
 # Backtest glissant sur les exports gold ; tableaux de résultats dans $(DATA_DIR)/export.
 backtest:
 	$(BIN)/python -m pkgpulse.forecast backtest
+
+# Prévisions J+1 et J+7 des champions ; ORIGIN=AAAA-MM-JJ pour prévoir depuis un jour passé.
+forecast:
+	$(BIN)/python -m pkgpulse.forecast predict $(if $(ORIGIN),--origin $(ORIGIN))
 
 # Données synthétiques au format bronze : dbt tourne sans télécharger crates.io.
 sample:

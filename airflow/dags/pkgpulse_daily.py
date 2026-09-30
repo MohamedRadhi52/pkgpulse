@@ -1,4 +1,4 @@
-"""DAG quotidien PkgPulse : ingestion, dbt, puis export des agrégats gold.
+"""DAG quotidien PkgPulse : ingestion, dbt, export des agrégats gold, backtest et prévision.
 
 En production, le même enchaînement tourne dans GitHub Actions (.github/workflows/daily.yml),
 gratuit pour un dépôt public. Ce DAG porte la logique d'orchestration : dépendances, relances et
@@ -32,4 +32,10 @@ with DAG(
     )
     dbt = BashOperator(task_id="dbt", bash_command=f"{make} dbt")
     export = BashOperator(task_id="export", bash_command=f"{make} publish")
-    chain(ingest, dbt, export)
+    backtest = BashOperator(task_id="backtest", bash_command=f"{make} backtest")
+    # La date logique fixe l'origine : rejouer un jour passé refait la prévision de ce jour-là,
+    # avec des modèles réentraînés sur les seules données connues alors.
+    forecast = BashOperator(
+        task_id="forecast", bash_command=make + " forecast ORIGIN={{ macros.ds_add(ds, -1) }}"
+    )
+    chain(ingest, dbt, export, backtest, forecast)

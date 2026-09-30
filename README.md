@@ -25,9 +25,12 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
   manquante ou une clé en double arrête l'ingestion avant toute écriture.
 - **dbt en architecture médaillon** : 10 modèles, 33 tests (unicité, fraîcheur, jours manquants,
   chute de volume) et un snapshot qui garde l'historique des paquets.
+- **Prévision J+1 et J+7** : un modèle LightGBM global par horizon, appris sur 260 séries à la
+  fois, comparé au naïf saisonnier et à ETS en backtest glissant, avec un test anti-fuite. Runs et
+  modèles suivis dans MLflow, avec un alias champion.
 - **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
   [release gold](../../releases/tag/gold), mis à jour par le pipeline.
-- **Qualité** : 29 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
+- **Qualité** : 38 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
   échantillon synthétique), pre-commit.
 
 ## Architecture
@@ -45,16 +48,36 @@ flowchart LR
         SV["Silver<br/>typage, jointures"]
         G["Gold<br/>total, catégories, 200 paquets"]
     end
-    subgraph N["4. À venir"]
-        F["Prévision J+1 et J+7<br/>LightGBM, MLflow"]
+    subgraph M["4. Prévision"]
+        F["LightGBM J+1 et J+7<br/>backtest glissant, MLflow"]
+    end
+    subgraph N["5. À venir"]
         X["API FastAPI sur Cloud Run<br/>tableau de bord"]
     end
     A --- P
     D --- P
     P --- SV --- G --- F --- X
     classDef todo stroke-dasharray: 5 5
-    class F,X todo
+    class X todo
 ```
+
+## Résultats du backtest
+
+MASE moyenne par série (sous 1, on bat le naïf saisonnier) sur 9 origines de validation,
+du 18 avril au 21 juin 2026, jamais utilisées pour concevoir le modèle. Le modèle global LightGBM
+est le meilleur sur les paquets et les catégories, soit l'essentiel des 260 séries, et en moyenne
+à chaque horizon. Sur le total, série unique et très régulière, ETS fait mieux : un modèle par
+série suffit là où la série est lisse. Le pipeline refait ce backtest chaque jour sur toutes les origines ;
+les tableaux à jour sont dans la [release gold](../../releases/tag/gold).
+
+| Série | Horizon | Naïf saisonnier | ETS | LightGBM | Gain de LightGBM |
+|---|---|---|---|---|---|
+| Total | J+1 | 0,746 | 0,502 | 0,558 | -11 % |
+| Total | J+7 | 0,741 | 0,648 | 0,679 | -5 % |
+| Catégories | J+1 | 1,034 | 0,949 | 0,878 | +7 % |
+| Catégories | J+7 | 1,074 | 1,100 | 0,992 | +8 % |
+| Paquets suivis | J+1 | 0,823 | 0,675 | 0,625 | +7 % |
+| Paquets suivis | J+7 | 1,028 | 1,140 | 1,007 | +2 % |
 
 ## Ce que disent les données
 
@@ -86,6 +109,8 @@ make install   # environnement virtuel, dépendances et hooks pre-commit
 make check     # lint, tests et dbt sur un échantillon synthétique, comme la CI
 make ingest    # données réelles : archive depuis le 2025-11-01, puis dump du jour
 make dbt       # fraîcheur des sources, modèles silver et gold, tests et snapshot
+make backtest  # backtest glissant des références et de LightGBM, suivi dans MLflow
+make forecast  # prévisions J+1 et J+7 du modèle champion
 make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```
 
@@ -93,6 +118,7 @@ make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 
 ```text
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
+src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
 airflow/dags/          DAG quotidien (dépendances, relances, backfill)
 dbt/                   modèles silver et gold, tests, snapshot
 tests/                 tests pytest, avec un faux serveur crates.io

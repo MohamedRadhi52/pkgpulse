@@ -1,7 +1,7 @@
 name: Pipeline quotidien
 
-# Ingestion réelle depuis static.crates.io, dbt, puis publication des agrégats gold dans la
-# release gold. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
+# Ingestion réelle depuis static.crates.io, dbt, backtest et prévision, puis publication des
+# agrégats et des prévisions dans la release gold. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
 # exécution à l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
 on:
   schedule:
@@ -58,14 +58,19 @@ jobs:
       - name: dbt (fraîcheur, modèles, tests, snapshot)
         run: make dbt 2>&1 | tee dbt.log
 
-      - name: Publication des agrégats gold
+      - name: Export des agrégats gold
+        run: make publish
+
+      - name: Backtest et prévision
+        run: make backtest forecast 2>&1 | tee forecast.log
+
+      - name: Publication dans la release gold
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          make publish
           gh release view gold > /dev/null 2>&1 || gh release create gold \
             --title "Agrégats quotidiens" \
-            --notes "Téléchargements quotidiens de crates.io agrégés (total, catégories, paquets suivis), mis à jour par le pipeline quotidien. Source : dumps publics de crates.io."
+            --notes "Téléchargements quotidiens de crates.io agrégés (total, catégories, paquets suivis), prévisions et résultats du backtest, mis à jour par le pipeline quotidien. Source : dumps publics de crates.io."
           gh release upload gold data/export/*.csv --clobber
 
       # Les écritures sont atomiques : même après un échec, l'état est cohérent et la prochaine
@@ -80,7 +85,7 @@ jobs:
       - name: Bilan
         if: always()
         run: |
-          grep -hs -e "Bilan" -e "Done. PASS" ingest.log dbt.log \
+          grep -hs -e "Bilan" -e "Done. PASS" ingest.log dbt.log forecast.log \
             | sed 's/^[0-9: ,-]*/::notice title=Bilan::/' || true
           if [ "${{ steps.ingest.outcome }}" = failure ]; then
             echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"

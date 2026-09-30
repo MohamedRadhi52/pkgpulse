@@ -195,3 +195,30 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   des séries d'échelles différentes et se lit directement : sous 1, on bat le naïf saisonnier.
 - Références : naïf saisonnier (même jour de la semaine précédente) et AutoETS (saisonnalité de 7
   jours) de statsforecast. statsforecast impose pandas < 3 : pandas est épinglé en 2.3.3.
+
+## 11. Modèle global LightGBM et suivi MLflow
+
+- Un modèle LightGBM par horizon, appris sur les 260 séries à la fois (total, 58 catégories, 200
+  paquets et la série autres). Les volumes sont divisés par le niveau des 28 derniers jours : un
+  seul modèle apprend ainsi sur des séries allant de 10^5 à 10^9 téléchargements par jour. Perte
+  L1, cohérente avec la MASE.
+- La forme du modèle a été choisie sur les six premières origines du backtest (mars à mi-avril
+  2026) ; les résultats annoncés portent sur les origines suivantes.
+
+| Variante (MASE du total, origines de conception) | J+1 | J+7 |
+|---|---|---|
+| Naïf saisonnier | 0,740 | 0,855 |
+| Cible rapportée au niveau des 28 derniers jours | 1,081 | 0,753 |
+| Cible rapportée au même jour de la semaine précédente, avec la dynamique récente | 0,489 | 1,169 |
+
+  À J+1, le modèle apprend la correction à apporter au naïf saisonnier, avec l'évolution du
+  dernier jour et de la dernière semaine. À J+7, la cible reste rapportée au niveau des 28 jours,
+  plus stable qu'un seul jour, sans ces variables de court terme : les ajouter dégrade le total
+  à 1,055. Les réglages diffèrent aussi par horizon (modèle plus régularisé à J+1).
+- MLflow : une exécution par backtest (paramètres, MASE par niveau, horizon et modèle, tableaux),
+  dans une base SQLite conservée avec les données. Les modèles réentraînés sur tout l'historique
+  entrent au registre à chaque backtest, et reçoivent l'alias champion s'ils battent les deux
+  références en moyenne à chaque horizon. La prévision charge le champion, ou à défaut la
+  dernière version : elle ne s'arrête jamais faute de modèle.
+- Une prévision datée (backfill du DAG) réentraîne les modèles sur les seules données connues à
+  l'origine, pour ne pas utiliser un modèle qui a vu la suite.
