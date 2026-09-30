@@ -273,3 +273,17 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   Volume estimé : quelques Go lus par jour pour 1 To gratuit par mois, moins de 1 Go stocké.
 - Les résultats détaillés du backtest (une ligne par série, origine, horizon et modèle) sont
   désormais exportés avec les autres fichiers, pour recalculer les tableaux du README.
+
+## 16. API sur Cloud Run et déploiement continu
+
+- L'API FastAPI lit les fichiers publiés par le pipeline dans Cloud Storage (prévisions et
+  anomalies) et les relit au plus une fois par heure : pas de base de données à maintenir pour des
+  données qui changent une fois par jour. Tant que rien n'est publié, elle répond 503.
+- L'image ne contient que l'API (FastAPI, uvicorn, client Cloud Storage, sans pandas) : image
+  légère, démarrage rapide, utilisateur non root.
+- Enchaînement : push sur main, workflow Terraform puis, s'il réussit, workflow de déploiement :
+  image étiquetée par le commit, poussée dans Artifact Registry, nouvelle révision Cloud Run et
+  vérification de l'URL publique. Le service Cloud Run n'est pas dans Terraform, car son image
+  change à chaque déploiement.
+- Cloud Run descend à zéro instance et n'en dépasse pas une : l'offre gratuite couvre 2 millions de
+  requêtes par mois.

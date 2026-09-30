@@ -17,4 +17,7 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Avertissement interne à pandas 2.3 avec NumPy 2.5, sans effet sur les résultats.
-filterwarnings = ["ignore:The 'generic' unit for NumPy timedelta:DeprecationWarning"]
+filterwarnings = [
+    "ignore:The 'generic' unit for NumPy timedelta:DeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient`",
+]

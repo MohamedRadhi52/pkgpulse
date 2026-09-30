@@ -33,7 +33,7 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
   versions téléchargées, invisible sur le total.
 - **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
   [release gold](../../releases/tag/gold), mis à jour par le pipeline.
-- **Qualité** : 38 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
+- **Qualité** : 43 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
   échantillon synthétique), pre-commit.
 
 ## Architecture
@@ -54,14 +54,17 @@ flowchart LR
     subgraph M["4. Prévision"]
         F["LightGBM J+1 et J+7<br/>backtest glissant, MLflow"]
     end
-    subgraph N["5. À venir"]
-        X["API FastAPI sur Cloud Run<br/>tableau de bord"]
+    subgraph N["5. Service"]
+        X["API FastAPI<br/>sur Cloud Run"]
+    end
+    subgraph W["6. À venir"]
+        Y["Tableau de bord<br/>monitoring"]
     end
     A --- P
     D --- P
-    P --- SV --- G --- F --- X
+    P --- SV --- G --- F --- X --- Y
     classDef todo stroke-dasharray: 5 5
-    class X todo
+    class Y todo
 ```
 
 ## Résultats du backtest
@@ -107,6 +110,16 @@ et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'
 | ETS | 0,502 | 0,512 | 0,648 | 0,740 |
 | LightGBM | 0,558 | 0,604 | 0,679 | 0,650 |
 
+## API
+
+Déployée sur Cloud Run à chaque push, après le workflow Terraform, et documentée par OpenAPI :
+
+- `GET /forecast?series=paquet:serde` : prévisions J+1 et J+7 d'une série, avec leur intervalle à
+  90 % ;
+- `GET /series?level=categorie` : séries disponibles (total, catégories, paquets) ;
+- `GET /anomalies?days=30` : anomalies récentes ;
+- `GET /docs` : documentation interactive.
+
 ## Ce que disent les données
 
 - **La demande a été multipliée par 2,6** entre novembre 2025 et juin 2026 : de 382 à 1 008
@@ -129,7 +142,8 @@ et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'
 - [x] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
 - [x] Détection d'anomalies
 - [x] Entrepôt BigQuery et infrastructure Terraform
-- [ ] API FastAPI sur Cloud Run et tableau de bord en ligne
+- [x] API FastAPI sur Cloud Run, redéployée à chaque push
+- [ ] Tableau de bord en ligne, monitoring et ré-entraînement
 
 ## Démarrage
 
@@ -143,6 +157,7 @@ make dbt       # fraîcheur des sources, modèles silver et gold, tests et snaps
 make backtest  # backtest glissant des références et de LightGBM, suivi dans MLflow
 make forecast  # prévisions J+1 et J+7 du modèle champion
 make anomalies # anomalies sur les résidus de prévision à J+1
+make api       # API en local sur les exports, documentation sur /docs
 make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```
 
@@ -152,12 +167,13 @@ make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
 src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
 src/pkgpulse/anomalies/ détection d'anomalies sur les résidus de prévision
+src/pkgpulse/api/      API FastAPI : /forecast, /series, /anomalies
 infra/                 Terraform : bucket, datasets BigQuery, Artifact Registry
 airflow/dags/          DAG quotidien (dépendances, relances, backfill)
 dbt/                   modèles silver et gold, tests, snapshot
 tests/                 tests pytest, avec un faux serveur crates.io
 docs/                  cadrage et journal des décisions
-.github/workflows/     CI, pipeline quotidien, Terraform, keepalive et surveillance
+.github/workflows/     CI, pipeline quotidien, Terraform, déploiement, keepalive et surveillance
 ```
 
 ## Documentation

@@ -1,0 +1,5 @@
+*
+!requirements-api.txt
+!src/pkgpulse/__init__.py
+!src/pkgpulse/api/
+**/__pycache__
