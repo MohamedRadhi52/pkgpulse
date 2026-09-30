@@ -1,0 +1,24 @@
+sources:
+  - name: bronze
+    description: Fichiers Parquet écrits par l'ingestion (src/pkgpulse/ingest).
+    config:
+      meta:
+        external_location: "{{ env_var('PKGPULSE_DATA_DIR', 'data') }}/bronze/{name}.parquet"
+    tables:
+      - name: version_downloads
+        description: Téléchargements par version et par jour, un fichier par jour.
+        config:
+          meta:
+            external_location: "{{ env_var('PKGPULSE_DATA_DIR', 'data') }}/bronze/version_downloads/*.parquet"
+          loaded_at_field: "cast(date as timestamp)"
+          freshness:
+            warn_after: {count: 2, period: day}
+            error_after: {count: 4, period: day}
+      - name: crates
+        description: Paquets, remplacés à chaque dump.
+      - name: versions
+        description: Versions publiées, remplacées à chaque dump.
+      - name: categories
+        description: Catégories et sous-catégories (slug de la forme parent::enfant).
+      - name: crates_categories
+        description: Rattachement des paquets aux catégories.

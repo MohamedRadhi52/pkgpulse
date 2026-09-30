@@ -1,0 +1,77 @@
+models:
+  - name: silver_version_downloads
+    description: Téléchargements par version et par jour, jours complets seulement.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [version_id, download_date]
+    columns:
+      - name: download_date
+        data_tests: [not_null]
+      - name: version_id
+        data_tests:
+          - not_null
+          # Les versions des paquets supprimés depuis n'ont plus de métadonnées : on les mesure.
+          - relationships:
+              arguments:
+                to: ref('silver_versions')
+                field: version_id
+              config:
+                severity: warn
+      - name: downloads
+        data_tests: [not_null]
+      - name: source
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [archive, dump]
+
+  - name: silver_versions
+    description: Versions publiées, avec leur paquet et leur date de publication.
+    columns:
+      - name: version_id
+        data_tests: [unique, not_null]
+      - name: crate_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_crates')
+                field: crate_id
+      - name: published_at
+        data_tests: [not_null]
+
+  - name: silver_crates
+    description: Paquets avec leur dernière version publiée et leurs catégories.
+    columns:
+      - name: crate_id
+        data_tests: [unique, not_null]
+      - name: crate_name
+        data_tests: [unique, not_null]
+
+  - name: silver_categories
+    description: Catégories de premier niveau.
+    columns:
+      - name: category_slug
+        data_tests: [unique, not_null]
+
+  - name: silver_crate_categories
+    description: Rattachement de chaque paquet à ses catégories de premier niveau.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [crate_id, category_slug]
+    columns:
+      - name: category_slug
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('silver_categories')
+                field: category_slug
+
+  - name: silver_crate_downloads
+    description: Téléchargements par paquet et par jour.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [crate_id, download_date]

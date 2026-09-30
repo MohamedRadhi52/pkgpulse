@@ -1,12 +1,14 @@
 name: Pipeline quotidien
 
-# Ingestion réelle depuis static.crates.io. La couche bronze est conservée d'une exécution à
-# l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
+# Ingestion réelle depuis static.crates.io puis dbt. Les données (couche bronze, entrepôt DuckDB
+# et son snapshot) sont conservées d'une exécution à l'autre dans le cache d'Actions : seuls les
+# jours nouveaux ou corrigés sont réécrits.
 on:
   push:
     branches: [main]
     paths:
       - "src/pkgpulse/**"
+      - "dbt/**"
       - "requirements.txt"
       - ".github/workflows/daily.yml"
   workflow_dispatch:
@@ -26,6 +28,8 @@ jobs:
   pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      DBT_USE_COLORS: "false"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -45,6 +49,9 @@ jobs:
       - name: Ingestion bronze
         run: make ingest 2>&1 | tee ingest.log
 
+      - name: dbt (fraîcheur, modèles, tests, snapshot)
+        run: make dbt 2>&1 | tee dbt.log
+
       # Les écritures sont atomiques : même après un échec, l'état est cohérent et la prochaine
       # exécution reprend là où celle-ci s'est arrêtée.
       - name: Sauvegarder les données
@@ -57,7 +64,11 @@ jobs:
       - name: Bilan
         if: always()
         run: |
-          grep -h "Bilan" ingest.log | sed 's/^.*Bilan/::notice title=Ingestion::Bilan/' || true
-          if grep -q "Traceback" ingest.log; then
+          grep -hs -e "Bilan" -e "Done. PASS" ingest.log dbt.log \
+            | sed 's/^[0-9: ,-]*/::notice title=Bilan::/' || true
+          if grep -qs "Traceback" ingest.log; then
             echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"
+          fi
+          if grep -qs -e "Failure in" -e "Error in" dbt.log; then
+            echo "::error title=dbt::$(grep -hs -e 'Failure in' -e 'Error in' dbt.log | head -n 5 | tr '\n' ' ')"
           fi

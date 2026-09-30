@@ -1,0 +1,48 @@
+models:
+  - name: gold_daily_total
+    description: Téléchargements quotidiens de tout crates.io. Sert aussi de calendrier.
+    columns:
+      - name: download_date
+        data_tests: [unique, not_null, no_missing_days]
+      - name: downloads
+        data_tests:
+          - not_null
+          # Seuil calé sous le creux réel le plus bas (0,36 le jour de Noël 2025).
+          - volume_vs_moving_average:
+              arguments:
+                date_column: download_date
+                min_ratio: 0.3
+
+  - name: gold_daily_category
+    description: Téléchargements quotidiens par catégorie de premier niveau.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [category_slug, download_date]
+    columns:
+      - name: download_date
+        data_tests:
+          - no_missing_days:
+              arguments:
+                partition_by: category_slug
+
+  - name: gold_top_crates
+    description: Paquets suivis, classés par téléchargements sur la fenêtre de sélection.
+    columns:
+      - name: crate_rank
+        data_tests: [unique, not_null]
+      - name: crate_id
+        data_tests: [unique, not_null]
+
+  - name: gold_daily_crate
+    description: Téléchargements quotidiens et versions publiées de chaque paquet suivi.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [crate_id, download_date]
+    columns:
+      - name: download_date
+        data_tests:
+          - no_missing_days:
+              arguments:
+                partition_by: crate_id

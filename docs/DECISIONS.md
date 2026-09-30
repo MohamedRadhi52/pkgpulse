@@ -118,3 +118,37 @@ Le jour du dump n'est compté que jusqu'à l'heure du dump. Il est gardé en bro
 brut, et écarté en aval : un jour est complet si sa date est antérieure à la date de
 `extracted_at`. Le lendemain, le nouveau dump réécrit les jours dont le compte a changé, et
 l'ingestion journalise chaque correction (nombre de téléchargements avant et après).
+
+## 7. dbt : architecture médaillon, tests et snapshot
+
+- **Bronze** : les fichiers Parquet de l'ingestion, déclarés comme sources dbt et lus directement
+  par DuckDB. **Silver** : typage, renommage, jointures versions, paquets et catégories. **Gold** :
+  séries quotidiennes prêtes pour la prévision (total, catégories, paquets suivis).
+- `silver_version_downloads` est une vue : la donnée est déjà typée en bronze et une copie
+  doublerait le stockage. Les autres modèles sont des tables.
+- Les séries gold par catégorie et par paquet couvrent tout le calendrier, avec des zéros les
+  jours sans téléchargement. Le calendrier est l'ensemble des jours complets du total, dont la
+  continuité est testée.
+- Catégories : seul le premier niveau du slug est gardé (`development-tools::testing` compte pour
+  `development-tools`). Un paquet compte une fois par catégorie de premier niveau.
+
+Tests, et ce qu'ils protègent :
+
+| Test | Pourquoi |
+|---|---|
+| unicité et non-nullité des clés, unicité des couples (version, jour), (paquet, jour) | un doublon gonfle les séries sans erreur visible |
+| relations versions et paquets | une jointure perdrait des lignes en silence |
+| relation téléchargements et versions, en avertissement | mesure les téléchargements des paquets supprimés depuis, absents des métadonnées |
+| fraîcheur de la source (alerte à 2 jours, erreur à 4) | le dump doit arriver chaque jour |
+| aucun jour manquant | un trou fausserait les décalages et la saisonnalité |
+| volume comparé à la moyenne du même jour sur quatre semaines | une chute trahit une perte de données ; seuil de 0,3, sous le creux réel le plus bas (0,36 à Noël 2025) |
+
+Le snapshot `crates_snapshot` (stratégie timestamp sur `updated_at`, qui change à chaque
+publication) garde l'historique de la dernière version et des catégories de chaque paquet, que le
+dump écrase chaque jour.
+
+En CI, dbt tourne sur un échantillon synthétique au format bronze (`python -m pkgpulse.sample`),
+du 2025-11-01 à aujourd'hui, pour que la fraîcheur et la fenêtre des paquets suivis s'appliquent :
+aucune donnée brute n'est versionnée. Les données réelles ne passent que par le workflow du
+pipeline. Le SQL reste standard et passe par les macros inter-bases de dbt (`split_part`,
+`listagg`, `datediff`), pour préparer le profil BigQuery du lot 3.

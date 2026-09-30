@@ -1,0 +1,10 @@
+snapshots:
+  - name: crates_snapshot
+    description: >
+      Historique des métadonnées des paquets (dernière version, catégories). Le dump ne donne
+      que l'état du jour ; le snapshot garde une ligne par changement, datée par dbt.
+    relation: ref('silver_crates')
+    config:
+      unique_key: crate_id
+      strategy: timestamp
+      updated_at: updated_at

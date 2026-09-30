@@ -1,0 +1,7 @@
+pkgpulse:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('PKGPULSE_DATA_DIR', 'data') }}/warehouse.duckdb"
+      threads: 4

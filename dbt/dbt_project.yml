@@ -1,0 +1,26 @@
+name: pkgpulse
+version: "1.0.0"
+profile: pkgpulse
+
+flags:
+  send_anonymous_usage_stats: false
+
+vars:
+  # Fenêtre de sélection des paquets suivis, antérieure à la période d'évaluation
+  # (docs/cadrage.md).
+  top_crates_start: "2025-11-01"
+  top_crates_end: "2026-02-28"
+  top_crates_count: 200
+
+models:
+  pkgpulse:
+    silver:
+      +schema: silver
+      +materialized: table
+    gold:
+      +schema: gold
+      +materialized: table
+
+snapshots:
+  pkgpulse:
+    +schema: snapshots
