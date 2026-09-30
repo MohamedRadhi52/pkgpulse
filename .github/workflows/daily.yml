@@ -4,6 +4,8 @@ name: Pipeline quotidien
 # release gold. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
 # exécution à l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
 on:
+  schedule:
+    - cron: "17 5 * * *"  # le dump de crates.io est pris vers 2 h UTC
   push:
     branches: [main]
     paths:
@@ -46,8 +48,12 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
 
+      # Une relance après une pause absorbe les erreurs passagères (HTTP 500 le 2026-09-30) ; elle
+      # est sûre car l'ingestion est idempotente et reprend au premier jour manquant.
       - name: Ingestion bronze
-        run: make ingest 2>&1 | tee ingest.log
+        id: ingest
+        run: |
+          make ingest 2>&1 | tee ingest.log || { sleep 300; make ingest 2>&1 | tee -a ingest.log; }
 
       - name: dbt (fraîcheur, modèles, tests, snapshot)
         run: make dbt 2>&1 | tee dbt.log
@@ -76,8 +82,10 @@ jobs:
         run: |
           grep -hs -e "Bilan" -e "Done. PASS" ingest.log dbt.log \
             | sed 's/^[0-9: ,-]*/::notice title=Bilan::/' || true
-          if grep -qs "Traceback" ingest.log; then
+          if [ "${{ steps.ingest.outcome }}" = failure ]; then
             echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"
+          elif grep -qs "Traceback" ingest.log; then
+            echo "::warning title=Ingestion::réussie après une relance automatique"
           fi
           if grep -qs -e "Failure in" -e "Error in" dbt.log; then
             echo "::error title=dbt::$(grep -hs -e 'Failure in' -e 'Error in' dbt.log | head -n 5 | tr '\n' ' ')"

@@ -71,7 +71,7 @@ flowchart LR
 
 - [x] Ingestion bronze : archive, dump, jonction, données tardives
 - [x] Modèles dbt silver et gold, tests et snapshot
-- [ ] Orchestration : DAG Airflow et exécution quotidienne planifiée
+- [x] Orchestration : DAG Airflow et exécution quotidienne planifiée
 - [ ] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
 - [ ] Détection d'anomalies
 - [ ] Entrepôt BigQuery et infrastructure Terraform
@@ -86,16 +86,18 @@ make install   # environnement virtuel, dépendances et hooks pre-commit
 make check     # lint, tests et dbt sur un échantillon synthétique, comme la CI
 make ingest    # données réelles : archive depuis le 2025-11-01, puis dump du jour
 make dbt       # fraîcheur des sources, modèles silver et gold, tests et snapshot
+make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```
 
 ## Organisation du dépôt
 
 ```text
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
+airflow/dags/          DAG quotidien (dépendances, relances, backfill)
 dbt/                   modèles silver et gold, tests, snapshot
 tests/                 tests pytest, avec un faux serveur crates.io
 docs/                  cadrage et journal des décisions
-.github/workflows/     CI, pipeline sur données réelles, keepalive
+.github/workflows/     CI, pipeline quotidien, keepalive et surveillance
 ```
 
 ## Documentation

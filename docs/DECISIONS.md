@@ -163,3 +163,20 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
 - Seuls ces agrégats sont publiés, conformément à la politique d'accès de crates.io ; la couche
   bronze reste dans le cache privé d'Actions.
 - Ces fichiers servent de source aux étapes de prévision, au tableau de bord et à l'API.
+
+## 9. Orchestration : Airflow pour la logique, GitHub Actions pour la production
+
+- Le DAG `airflow/dags/pkgpulse_daily.py` décrit l'enchaînement (ingestion, dbt, export), les
+  relances et la date logique. Il est testé en local par `make airflow-test` : sur l'échantillon
+  synthétique, il est rejoué sur sept jours consécutifs, et chaque exécution passe les 44 contrôles
+  dbt. Rejouer un jour passé ne crée aucun doublon, grâce à l'idempotence de l'ingestion.
+- En production, un seul traitement par jour ne justifie pas un serveur Airflow : le même
+  enchaînement tourne dans GitHub Actions, gratuit pour un dépôt public, chaque jour à 5 h 17 UTC,
+  après le dump de crates.io (pris vers 2 h UTC).
+- Relances : le premier backfill réel a échoué sur une erreur HTTP 500 passagère de
+  static.crates.io, au 48e des 242 fichiers d'archive. La relance manuelle n'a téléchargé que les
+  195 jours restants. Depuis, la relance est automatique : deux tentatives de plus dans Airflow,
+  une relance après cinq minutes dans Actions.
+- Alertes : un échec du pipeline déclenche l'e-mail de GitHub ; un workflow de surveillance
+  quotidien échoue, et alerte à son tour, si le pipeline n'a pas réussi depuis 30 heures, ce qui
+  couvre aussi une exécution qui n'a jamais démarré.

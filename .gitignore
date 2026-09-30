@@ -1,5 +1,6 @@
 # Environnement Python
 .venv/
+.venv-airflow/
 __pycache__/
 *.egg-info/
 .pytest_cache/

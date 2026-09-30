@@ -1,10 +1,11 @@
-name: Keepalive
+name: Keepalive et surveillance
 
-# GitHub désactive les workflows planifiés d'un dépôt public après 60 jours sans activité.
-# Ce workflow les réactive chaque mois par l'API, sans commit artificiel.
+# GitHub désactive les workflows planifiés d'un dépôt public après 60 jours sans activité : ce
+# workflow les réactive par l'API, sans commit artificiel. Il alerte aussi (échec, donc e-mail) si
+# le pipeline quotidien n'a pas réussi depuis 30 heures, y compris s'il n'a jamais démarré.
 on:
   schedule:
-    - cron: "17 6 1 * *"
+    - cron: "17 12 * * *"
   push:
     branches: [main]
     paths: [.github/workflows/keepalive.yml]
@@ -16,12 +17,27 @@ permissions:
 jobs:
   keepalive:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
     steps:
       - name: Réactiver les workflows du dépôt
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
           for id in $(gh api "repos/$REPO/actions/workflows" --jq '.workflows[].id'); do
             gh api --method PUT "repos/$REPO/actions/workflows/$id/enable"
           done
+
+      - name: Vérifier la dernière réussite du pipeline quotidien
+        run: |
+          last=$(gh run list --repo "$REPO" --workflow daily.yml --status success --limit 1 \
+            --json updatedAt --jq '.[0].updatedAt // empty')
+          if [ -z "$last" ]; then
+            echo "::error title=Pipeline quotidien::aucune exécution réussie"
+            exit 1
+          fi
+          hours=$(( ($(date +%s) - $(date -d "$last" +%s)) / 3600 ))
+          echo "Dernière réussite du pipeline quotidien : $last, il y a $hours h"
+          if [ "$hours" -gt 30 ]; then
+            echo "::error title=Pipeline quotidien::aucune réussite depuis $hours heures"
+            exit 1
+          fi

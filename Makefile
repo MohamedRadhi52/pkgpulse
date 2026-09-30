@@ -8,7 +8,7 @@ DBT_FLAGS := --project-dir dbt --profiles-dir dbt
 # Chemin absolu : l'ingestion et dbt lisent les mêmes données, quel que soit le dossier courant.
 export PKGPULSE_DATA_DIR = $(abspath $(DATA_DIR))
 
-.PHONY: install lint format test ingest dbt publish sample check
+.PHONY: install lint format test ingest dbt publish sample check airflow-test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -47,3 +47,19 @@ sample:
 # Les mêmes vérifications que la CI.
 check: lint test sample
 	$(MAKE) dbt DATA_DIR=$(SAMPLE_DIR)
+
+# DAG Airflow sur l'échantillon, rejoué sur les sept derniers jours (backfill), dans un
+# environnement séparé : Airflow impose ses propres versions de dépendances.
+AIRFLOW_VERSION := 3.3.2
+AIRFLOW_VENV := .venv-airflow
+AIRFLOW := AIRFLOW_HOME=$(abspath data/airflow) AIRFLOW__CORE__DAGS_FOLDER=$(abspath airflow/dags) \
+	AIRFLOW__CORE__LOAD_EXAMPLES=false $(AIRFLOW_VENV)/bin/airflow
+
+airflow-test:
+	$(PYTHON) -m venv $(AIRFLOW_VENV)
+	$(AIRFLOW_VENV)/bin/pip install --quiet --disable-pip-version-check "apache-airflow==$(AIRFLOW_VERSION)" \
+		--constraint https://raw.githubusercontent.com/apache/airflow/constraints-$(AIRFLOW_VERSION)/constraints-3.14.txt
+	$(AIRFLOW) db migrate
+	for days in 7 6 5 4 3 2 1; do \
+		$(AIRFLOW) dags test pkgpulse_daily $$(date -u -d "$$days days ago" +%F) -c '{"sample": true}' || exit 1; \
+	done
