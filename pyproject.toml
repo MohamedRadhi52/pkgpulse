@@ -20,4 +20,5 @@ testpaths = ["tests"]
 filterwarnings = [
     "ignore:The 'generic' unit for NumPy timedelta:DeprecationWarning",
     "ignore:Using `httpx` with `starlette.testclient`",
+    "ignore::DeprecationWarning:mlflow",
 ]

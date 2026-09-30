@@ -5,16 +5,14 @@ import logging
 
 import pandas as pd
 
-from pkgpulse.config import DATA_DIR, EXPORT_DIR
+from pkgpulse.config import BACKTEST_PATH, DATA_DIR, EXPORT_DIR, HISTORY_PATH
 from pkgpulse.forecast import tracking
-from pkgpulse.forecast.backtest import HORIZONS, mase_table, origins, run_backtest
+from pkgpulse.forecast.backtest import mase_table, origins, run_backtest, scales
 from pkgpulse.forecast.baselines import forecast_baselines
 from pkgpulse.forecast.conformal import coverage_table, quantiles
 from pkgpulse.forecast.hierarchy import bottom_up_table
 from pkgpulse.forecast.lgbm import fit_models, forecast_lgbm, predict
 from pkgpulse.forecast.series import load_series
-
-BACKTEST_PATH = DATA_DIR / "forecast" / "backtest.parquet"
 
 log = logging.getLogger(__name__)
 
@@ -45,9 +43,10 @@ def backtest() -> None:
         mase,
         {"origins": results["origin"].nunique(), "last_day": str(series["ds"].max().date())},
         [EXPORT_DIR / f"{name}.csv" for name in tables],
-        fit_models(series),
-        champion,
     )
+    if not tracking.has_alias(tracking.CHAMPION):
+        # Premier lancement : le modèle entre au registre, champion s'il bat les références.
+        tracking.register(fit_models(series), tracking.CHAMPION if champion else None)
 
 
 def beats_baselines(mase: pd.DataFrame) -> bool:
@@ -57,17 +56,27 @@ def beats_baselines(mase: pd.DataFrame) -> bool:
 
 
 def forecast(origin: pd.Timestamp | None) -> None:
-    """Prévisions J+1 et J+7 de chaque série, avec intervalles conformels à 90 %."""
+    """Prévisions J+1 et J+7 de chaque série, avec intervalles conformels à 90 %.
+
+    Le champion est servi ; un éventuel challenger prévoit en parallèle, sans être publié, pour
+    que le monitoring compare les deux sur les mêmes jours.
+    """
     series = load_series(EXPORT_DIR)
     tracking.setup(DATA_DIR)
-    if origin is None:
-        models = tracking.load_models(HORIZONS)
-    else:
+    dated = origin is not None
+    if dated:
         # Prévision datée : modèles réentraînés sur les seules données connues à cette date.
         series = series[series["ds"] <= origin]
-        models = fit_models(series)
+        roles = {tracking.CHAMPION: fit_models(series)}
+    else:
+        roles = {tracking.CHAMPION: tracking.load_models()}
+        if tracking.has_alias(tracking.CHALLENGER):
+            roles[tracking.CHALLENGER] = tracking.load_models(tracking.CHALLENGER)
     origin = series["ds"].max()
-    preds = predict(models, series)
+    preds = pd.concat(
+        [predict(models, series).assign(role=role) for role, models in roles.items()],
+        ignore_index=True,
+    )
     preds["h"] = (preds["ds"] - origin).dt.days
 
     levels = series.drop_duplicates("unique_id")[["unique_id", "level"]]
@@ -78,12 +87,27 @@ def forecast(origin: pd.Timestamp | None) -> None:
     )
     preds["lower"] = (preds["y_hat"] - preds["q"] * preds["scale"]).clip(lower=0)
     preds["upper"] = preds["y_hat"] + preds["q"] * preds["scale"]
+    preds = preds.merge(scales(series)[["unique_id", "mase_scale"]], on="unique_id")
+    preds = preds.assign(origin=origin)
+    if not dated:
+        save_history(preds)
+
     columns = ["unique_id", "level", "origin", "ds", "h", "y_hat", "lower", "upper"]
-    preds = preds.assign(origin=origin)[columns].round(0)
-    preds.to_csv(EXPORT_DIR / "forecasts.csv", index=False)
+    served = preds.loc[preds["role"] == tracking.CHAMPION, columns].round(0)
+    served.to_csv(EXPORT_DIR / "forecasts.csv", index=False)
     log.info(
-        "Bilan prévision : %d séries depuis le %s", preds["unique_id"].nunique(), origin.date()
+        "Bilan prévision : %d séries depuis le %s", served["unique_id"].nunique(), origin.date()
     )
+
+
+def save_history(preds: pd.DataFrame) -> None:
+    """Ajoute les prévisions du jour à l'historique, en remplaçant celles de la même origine."""
+    columns = ["unique_id", "level", "role", "origin", "ds", "h", "y_hat", "mase_scale"]
+    today = preds[columns]
+    if HISTORY_PATH.exists():
+        past = pd.read_parquet(HISTORY_PATH)
+        today = pd.concat([past[past["origin"] != today["origin"].iloc[0]], today])
+    today.to_parquet(HISTORY_PATH, index=False)
 
 
 def main() -> None:

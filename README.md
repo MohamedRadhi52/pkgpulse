@@ -33,7 +33,7 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
   versions téléchargées, invisible sur le total.
 - **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
   [release gold](../../releases/tag/gold), mis à jour par le pipeline.
-- **Qualité** : 43 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
+- **Qualité** : 47 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
   échantillon synthétique), pre-commit.
 
 ## Architecture
@@ -143,7 +143,8 @@ Déployée sur Cloud Run à chaque push, après le workflow Terraform, et docume
 - [x] Détection d'anomalies
 - [x] Entrepôt BigQuery et infrastructure Terraform
 - [x] API FastAPI sur Cloud Run, redéployée à chaque push
-- [ ] Tableau de bord en ligne, monitoring et ré-entraînement
+- [x] Monitoring : erreurs réalisées, MASE glissante, champion contre challenger
+- [ ] Tableau de bord en ligne
 
 ## Démarrage
 
@@ -156,6 +157,7 @@ make ingest    # données réelles : archive depuis le 2025-11-01, puis dump du 
 make dbt       # fraîcheur des sources, modèles silver et gold, tests et snapshot
 make backtest  # backtest glissant des références et de LightGBM, suivi dans MLflow
 make forecast  # prévisions J+1 et J+7 du modèle champion
+make monitor   # erreurs réalisées, dérive et règle champion contre challenger
 make anomalies # anomalies sur les résidus de prévision à J+1
 make api       # API en local sur les exports, documentation sur /docs
 make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
@@ -166,6 +168,7 @@ make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```text
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
 src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
+src/pkgpulse/monitor/   monitoring : erreurs réalisées, dérive, champion contre challenger
 src/pkgpulse/anomalies/ détection d'anomalies sur les résidus de prévision
 src/pkgpulse/api/      API FastAPI : /forecast, /series, /anomalies
 infra/                 Terraform : bucket, datasets BigQuery, Artifact Registry

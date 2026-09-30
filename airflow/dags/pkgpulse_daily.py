@@ -1,4 +1,4 @@
-"""DAG quotidien PkgPulse : ingestion, dbt, export, backtest, prévision et anomalies.
+"""DAG quotidien PkgPulse : ingestion, dbt, export, backtest, prévision, monitoring, anomalies.
 
 En production, le même enchaînement tourne dans GitHub Actions (.github/workflows/daily.yml),
 gratuit pour un dépôt public. Ce DAG porte la logique d'orchestration : dépendances, relances et
@@ -38,5 +38,6 @@ with DAG(
     forecast = BashOperator(
         task_id="forecast", bash_command=make + " forecast ORIGIN={{ macros.ds_add(ds, -1) }}"
     )
+    monitor = BashOperator(task_id="monitor", bash_command=f"{make} monitor")
     anomalies = BashOperator(task_id="anomalies", bash_command=f"{make} anomalies")
-    chain(ingest, dbt, export, backtest, forecast, anomalies)
+    chain(ingest, dbt, export, backtest, forecast, monitor, anomalies)

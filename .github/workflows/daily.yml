@@ -61,8 +61,8 @@ jobs:
       - name: Export des agrégats gold
         run: make publish
 
-      - name: Backtest, prévision et anomalies
-        run: make backtest forecast anomalies 2>&1 | tee forecast.log
+      - name: Backtest, prévision, monitoring et anomalies
+        run: make backtest forecast monitor anomalies 2>&1 | tee forecast.log
 
       - name: Publication dans la release gold
         env:
@@ -110,6 +110,9 @@ jobs:
             echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"
           elif grep -qs "Traceback" ingest.log; then
             echo "::warning title=Ingestion::réussie après une relance automatique"
+          fi
+          if grep -qs "dérive détectée" forecast.log; then
+            echo "::warning title=Monitoring::$(grep -h 'dérive détectée' forecast.log | sed 's/^.*Bilan monitoring : //')"
           fi
           if grep -qs -e "Failure in" -e "Error in" dbt.log dbt-bigquery.log; then
             errors=$(grep -hs -A 2 -e 'Failure in' -e 'Error in' dbt.log dbt-bigquery.log | head -n 15)

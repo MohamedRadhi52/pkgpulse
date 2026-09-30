@@ -290,3 +290,20 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   change à chaque déploiement.
 - Cloud Run descend à zéro instance et n'en dépasse pas une : l'offre gratuite couvre 2 millions de
   requêtes par mois.
+
+## 17. Monitoring et ré-entraînement : champion contre challenger
+
+- Chaque prévision servie est ajoutée à un historique (une origine par jour, remplacée en cas de
+  relance). Dès que la valeur réelle est connue, son erreur est rapportée à l'échelle de la MASE,
+  puis moyennée par jour, niveau et horizon, et lissée sur 7 jours (`monitoring.csv`).
+- Seuil de dérive tiré du backtest : la MASE des 5 % pires origines de LightGBM, par niveau et par
+  horizon (1,16 pour les paquets à J+1). La décision se prend sur les 200 paquets à J+1, le signal
+  le plus stable ; la fraîcheur et le volume restent surveillés par dbt.
+- Au-delà du seuil, un challenger est entraîné sur tout l'historique. Il prévoit en parallèle du
+  champion, sans être servi par l'API. Après 7 jours, il n'est promu que s'il bat le champion sur
+  les mêmes jours et les mêmes séries ; sinon il est écarté. On ne remplace donc jamais un modèle
+  sur une impression : seulement sur une erreur réalisée plus basse.
+- Le registre ne reçoit plus de version à chaque backtest : seulement le premier champion, puis
+  les challengers.
+- Un test simule une dérive (prévisions trois fois trop hautes) et vérifie qu'elle déclenche le
+  ré-entraînement ; deux autres vérifient la promotion et l'abandon du challenger.
