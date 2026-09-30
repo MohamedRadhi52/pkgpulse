@@ -307,3 +307,15 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   les challengers.
 - Un test simule une dérive (prévisions trois fois trop hautes) et vérifie qu'elle déclenche le
   ré-entraînement ; deux autres vérifient la promotion et l'abandon du challenger.
+
+## 18. Tableau de bord statique et chiffres publiés
+
+- Le tableau de bord est un site statique sur GitHub Pages : une page, un script et Chart.js
+  chargé depuis un CDN, sans framework ni étape de build. Le pipeline génère chaque jour
+  `site/data.json` à partir des exports : 120 jours de réalisé et de prévision rejouée à J+1 avec
+  son intervalle, les prévisions J+1 et J+7, les anomalies, le backtest et le monitoring.
+- La prévision rejouée à J+1 vient du modèle réentraîné à chaque origine du backtest et appliqué
+  chaque jour : elle montre ce que le modèle aurait prévu la veille, sans fuite, dès le premier
+  jour, sans attendre que l'historique de production s'accumule.
+- Les tableaux publiés (backtest, direct contre ascendant) portent sur les seules origines de
+  validation, comme le README : les six origines de conception n'y entrent plus.

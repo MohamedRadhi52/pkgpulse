@@ -1,7 +1,8 @@
 name: Pipeline quotidien
 
 # Ingestion réelle depuis static.crates.io, dbt, backtest et prévision, publication des agrégats
-# et des prévisions dans la release gold, puis copie dans Cloud Storage et dbt sur BigQuery. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
+# et des prévisions dans la release gold, tableau de bord sur GitHub Pages, puis copie dans
+# Cloud Storage et dbt sur BigQuery. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
 # exécution à l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
 on:
   schedule:
@@ -11,6 +12,7 @@ on:
     paths:
       - "src/pkgpulse/**"
       - "dbt/**"
+      - "site/**"
       - "requirements.txt"
       - ".github/workflows/daily.yml"
   workflow_dispatch:
@@ -73,6 +75,12 @@ jobs:
             --notes "Téléchargements quotidiens de crates.io agrégés (total, catégories, paquets suivis), prévisions et résultats du backtest, mis à jour par le pipeline quotidien. Source : dumps publics de crates.io."
           gh release upload gold data/export/*.csv --clobber
 
+      - name: Tableau de bord
+        run: make dashboard
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
       - uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -118,3 +126,17 @@ jobs:
             errors=$(grep -hs -A 2 -e 'Failure in' -e 'Error in' dbt.log dbt-bigquery.log | head -n 15)
             echo "::error title=dbt::$(echo "$errors" | tr '\n' ' ')"
           fi
+
+  # Publication du tableau de bord sur GitHub Pages, une fois le pipeline réussi.
+  pages:
+    needs: pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

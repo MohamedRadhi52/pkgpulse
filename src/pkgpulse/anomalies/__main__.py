@@ -14,6 +14,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     series = load_series(EXPORT_DIR)
     scored = robust_scores(one_step_residuals(series, origins(series)))
+    scored.round(3).to_csv(EXPORT_DIR / "one_step.csv", index=False)
     flagged = scored[scored["anomaly"] != ""]
     flagged.round(3).to_csv(EXPORT_DIR / "anomalies.csv", index=False)
     log.info("Bilan anomalies : %d jours signalés sur %d résidus", len(flagged), len(scored))

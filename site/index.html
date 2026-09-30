@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PkgPulse : téléchargements de crates.io et prévisions</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>PkgPulse</h1>
+    <p>Téléchargements quotidiens de crates.io, le registre de paquets Rust : prévisions à J+1 et
+      J+7, intervalles à 90 % et anomalies. Données au <strong id="updated">...</strong>, mises à
+      jour chaque jour par le pipeline.</p>
+    <nav>
+      <a href="https://pkgpulse-api-bnhde7a6fa-uc.a.run.app/docs">API</a>
+      <a href="https://github.com/MohamedRadhi52/pkgpulse">Code source</a>
+      <a href="https://github.com/MohamedRadhi52/pkgpulse/releases/tag/gold">Données ouvertes</a>
+    </nav>
+  </header>
+  <main>
+    <label class="picker">Série <select id="series"></select></label>
+    <section class="cards" id="cards"></section>
+    <section class="panel">
+      <h2>Réalisé et prévision à J+1, avec son intervalle à 90 %</h2>
+      <canvas id="history"></canvas>
+      <p class="note">Prévisions rejouées sans fuite : chaque jour est prévu la veille, par un
+        modèle qui n'a vu que le passé. Points rouges : anomalies détectées.</p>
+    </section>
+    <section class="panel">
+      <h2>Anomalies de la série sur 120 jours</h2>
+      <table id="anomalies"></table>
+    </section>
+    <section class="panel">
+      <h2>Backtest : MASE sur les origines de validation</h2>
+      <table id="backtest"></table>
+      <p class="note">Sous 1, le modèle bat le naïf saisonnier. En gras : le meilleur modèle.</p>
+    </section>
+    <section class="panel">
+      <h2>Monitoring : MASE réalisée sur 7 jours, à J+1</h2>
+      <canvas id="monitoring"></canvas>
+      <p class="note" id="monitoring-note">Seuil de dérive en pointillés, tiré du backtest.</p>
+    </section>
+  </main>
+</body>
+</html>

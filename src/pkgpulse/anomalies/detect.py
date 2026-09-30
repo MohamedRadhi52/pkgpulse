@@ -11,10 +11,10 @@ WINDOW = 56  # jours de résidus passés servant de référence
 
 
 def one_step_residuals(series: pd.DataFrame, origin_dates: pd.DatetimeIndex) -> pd.DataFrame:
-    """Résidus relatifs à J+1 : modèle réentraîné chaque semaine, prévision chaque jour.
+    """Prévisions et résidus à J+1 : modèle réentraîné à chaque origine, prévision chaque jour.
 
     Les variables d'une origine n'utilisent que les données jusqu'à cette origine, et chaque
-    modèle ne voit que les cibles antérieures à sa semaine : aucune fuite.
+    modèle ne voit que les cibles antérieures à sa période : aucune fuite.
     """
     rows = build_features(series, 1)
     rows = rows[rows["target"].notna()]
@@ -23,8 +23,16 @@ def one_step_residuals(series: pd.DataFrame, origin_dates: pd.DatetimeIndex) -> 
     for start, end in zip(origin_dates, ends, strict=True):
         model = fit_models(series[series["ds"] <= start], horizons=(1,))[1]
         week = rows[(rows["origin"] >= start) & (rows["origin"] < end)]
-        parts.append(week.assign(residual=week["target"] - model.predict(week[FEATURES])))
-    return pd.concat(parts, ignore_index=True)[["unique_id", "level", "ds", "residual"]]
+        predicted = model.predict(week[FEATURES])
+        parts.append(
+            week.assign(
+                residual=week["target"] - predicted,
+                y=week["target"] * week["reference"],
+                y_hat=predicted * week["reference"],
+            )
+        )
+    columns = ["unique_id", "level", "ds", "y", "y_hat", "scale", "residual"]
+    return pd.concat(parts, ignore_index=True)[columns]
 
 
 def robust_scores(residuals: pd.DataFrame) -> pd.DataFrame:

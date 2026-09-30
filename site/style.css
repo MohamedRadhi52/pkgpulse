@@ -1,0 +1,24 @@
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #222;
+  background: #f6f7f9;
+}
+header, main { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+header h1 { margin: 0 0 0.4rem; color: #1f4e79; }
+header p { margin: 0 0 0.8rem; line-height: 1.5; }
+nav a { margin-right: 1.2rem; color: #1f4e79; font-weight: 600; }
+.picker { display: block; margin-bottom: 1rem; font-weight: 600; }
+.picker select { margin-left: 0.5rem; padding: 0.3rem; font-size: 1rem; }
+.cards { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.card { flex: 1; min-width: 200px; background: #fff; border-radius: 8px; padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+.card span, .card small { display: block; color: #666; }
+.card strong { display: block; font-size: 1.6rem; margin: 0.3rem 0; color: #1f4e79; }
+.panel { background: #fff; border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+.panel h2 { font-size: 1.05rem; margin: 0 0 0.8rem; }
+.note { color: #666; font-size: 0.9rem; margin: 0.6rem 0 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid #eee; }
+th { color: #555; font-weight: 600; }

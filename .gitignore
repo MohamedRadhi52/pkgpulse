@@ -17,3 +17,6 @@ dbt/target/
 dbt/logs/
 dbt/.user.yml
 logs/
+
+# Données du tableau de bord, générées par le pipeline
+site/data.json

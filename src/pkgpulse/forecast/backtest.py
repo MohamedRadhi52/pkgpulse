@@ -6,6 +6,8 @@ import pandas as pd
 
 HORIZONS = (1, 7)
 FIRST_ORIGIN = pd.Timestamp("2026-03-01")
+# Premières origines, qui ont servi à choisir la forme du modèle (DECISIONS.md, décision 11).
+DESIGN_ORIGINS = 6
 
 Forecaster = Callable[[pd.DataFrame], pd.DataFrame]
 
@@ -43,6 +45,12 @@ def run_backtest(
     results["ase"] = (results["y"] - results["y_hat"]).abs() / results["mase_scale"]
     results["error"] = (results["y"] - results["y_hat"]).abs() / results["level_scale"]
     return results
+
+
+def validation(results: pd.DataFrame) -> pd.DataFrame:
+    """Résultats des seules origines de validation, jamais vues pendant la conception."""
+    design = sorted(results["origin"].unique())[:DESIGN_ORIGINS]
+    return results[~results["origin"].isin(design)]
 
 
 def mase_table(results: pd.DataFrame) -> pd.DataFrame:

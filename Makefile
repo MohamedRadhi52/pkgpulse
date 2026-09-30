@@ -8,7 +8,7 @@ DBT_FLAGS := --project-dir dbt --profiles-dir dbt
 # Chemin absolu : l'ingestion et dbt lisent les mêmes données, quel que soit le dossier courant.
 export PKGPULSE_DATA_DIR = $(abspath $(DATA_DIR))
 
-.PHONY: install lint format test ingest dbt dbt-bigquery publish api monitor backtest forecast anomalies sample check airflow-test
+.PHONY: install lint format test ingest dbt dbt-bigquery publish api monitor dashboard backtest forecast anomalies sample check airflow-test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -66,6 +66,10 @@ anomalies:
 # API en local sur les exports du pipeline, documentation sur http://127.0.0.1:8000/docs
 api:
 	PKGPULSE_DATA_URL=$(PKGPULSE_DATA_DIR)/export $(BIN)/uvicorn pkgpulse.api.main:app --reload
+
+# Données du tableau de bord (site/data.json) ; aperçu local : python -m http.server -d site
+dashboard:
+	$(BIN)/python -m pkgpulse.dashboard site
 
 # Données synthétiques au format bronze : dbt tourne sans télécharger crates.io.
 sample:

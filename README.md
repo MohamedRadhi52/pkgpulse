@@ -1,40 +1,68 @@
 # PkgPulse
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![Pipeline quotidien](../../actions/workflows/daily.yml/badge.svg)](../../actions/workflows/daily.yml)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776AB)
 ![dbt 1.12](https://img.shields.io/badge/dbt-1.12-FF694B)
-![DuckDB](https://img.shields.io/badge/DuckDB-1.5-FFC107)
 
-**Plateforme data construite sur les téléchargements réels de crates.io, le registre de paquets
-Rust.** Un pipeline idempotent alimente un entrepôt en architecture médaillon, qui servira à
-prévoir la demande à J+1 et J+7 par paquet et par catégorie, et à détecter les anomalies. Le
-problème est le même que la prévision de la demande dans le retail : saisonnalité hebdomadaire,
-séries avec des zéros, effets de nouvelles versions, pics exogènes.
+**En ligne, mis à jour chaque jour : le [tableau de bord](https://mohamedradhi52.github.io/pkgpulse/)
+et l'[API de prévision](https://pkgpulse-api-bnhde7a6fa-uc.a.run.app/docs).**
+
+Plateforme data construite sur les téléchargements réels de crates.io, le registre de paquets
+Rust. Un pipeline quotidien idempotent alimente un entrepôt en architecture médaillon (DuckDB et
+BigQuery), prévoit la demande à J+1 et J+7 pour 260 séries, mesure ses intervalles de prédiction,
+surveille sa propre erreur et détecte les anomalies. Le problème est celui de la prévision de la
+demande dans le retail : saisonnalité hebdomadaire, zéros, effets de nouvelles versions, pics
+exogènes.
 
 ![Téléchargements quotidiens sur crates.io](docs/img/telechargements_quotidiens.png)
 
+## Résultats
+
+MASE moyenne par série sur 20 origines de validation, du 18 avril au 17 septembre 2026, jamais
+utilisées pour concevoir le modèle. Sous 1, on bat le naïf saisonnier.
+
+| Série | Horizon | Naïf saisonnier | ETS | LightGBM | Gain sur la meilleure référence |
+|---|---|---|---|---|---|
+| Total | J+1 | 0,902 | 0,567 | 0,549 | +3 % |
+| Total | J+7 | 0,747 | 0,707 | 0,689 | +3 % |
+| Catégories (58 séries) | J+1 | 1,165 | 0,987 | 0,899 | +9 % |
+| Catégories | J+7 | 1,113 | 1,160 | 1,066 | +4 % |
+| Paquets suivis (200 séries) | J+1 | 0,971 | 0,717 | 0,630 | +12 % |
+| Paquets suivis | J+7 | 0,966 | 1,026 | 0,929 | +4 % |
+
+- **Intervalles conformels à 90 %** : couverture mesurée sans fuite de 94 % à J+1 et 97 % à J+7
+  sur les paquets, 92 % sur les catégories. Sur les paquets à J+1, la demi-largeur vaut 12 % du
+  niveau récent.
+- **Total direct ou ascendant** (somme des 200 paquets et de la série autres) : pour LightGBM, la
+  prévision directe gagne à J+1 (0,549 contre 0,579), l'agrégation à J+7 (0,642 contre 0,689).
+- **Étude de cas** : le [pic du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md) est un parcours
+  de presque tout le registre, six fois plus de versions téléchargées mais invisible sur le total.
+
 ## Points clés
 
-- **Ingestion idempotente** : un jour correspond à un fichier Parquet, remplacé de façon atomique.
-  Relancer ne crée jamais de doublon, et une exécution interrompue reprend au premier jour
-  manquant (testé, et vérifié en conditions réelles lors du premier backfill).
-- **Données tardives** : l'archive, définitive mais en retard de trois mois, et le dump quotidien,
-  qui couvre les 90 derniers jours, sont joints par une règle testée. Chaque correction tardive
-  est journalisée.
-- **Contrats de schéma** : crates.io ne garantit pas la stabilité de son schéma. Une colonne
-  manquante ou une clé en double arrête l'ingestion avant toute écriture.
-- **dbt en architecture médaillon** : 10 modèles, 33 tests (unicité, fraîcheur, jours manquants,
-  chute de volume) et un snapshot qui garde l'historique des paquets.
-- **Prévision J+1 et J+7** : un modèle LightGBM global par horizon, appris sur 260 séries à la
-  fois, comparé au naïf saisonnier et à ETS en backtest glissant, avec un test anti-fuite. Intervalles
-  conformels à 90 %, runs et modèles suivis dans MLflow avec un alias champion.
-- **Détection d'anomalies** : score robuste sur les résidus de prévision, et
-  [étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md), un pic de six fois plus de
-  versions téléchargées, invisible sur le total.
-- **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
-  [release gold](../../releases/tag/gold), mis à jour par le pipeline.
-- **Qualité** : 47 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
-  échantillon synthétique), pre-commit.
+- **Ingestion idempotente** : un jour correspond à un fichier Parquet remplacé de façon atomique.
+  Relancer ne crée jamais de doublon ; une exécution interrompue reprend au premier jour manquant,
+  ce qui a servi pour de vrai après une erreur HTTP 500 de crates.io.
+- **Données tardives** : l'archive, définitive mais en retard de trois mois, et le dump quotidien
+  des 90 derniers jours sont joints par une règle testée.
+- **Contrats de schéma** : crates.io ne garantit pas son schéma ; une colonne manquante ou une clé
+  en double arrête l'ingestion avant toute écriture.
+- **dbt en architecture médaillon**, sur DuckDB et sur BigQuery : 10 modèles, 33 tests (unicité,
+  fraîcheur, jours manquants, chute de volume) et un snapshot de l'historique des paquets.
+- **Prévision** : un modèle LightGBM global par horizon, appris sur les 260 séries, comparé au
+  naïf saisonnier et à ETS en backtest glissant, avec des tests anti-fuite. Conception et
+  validation sur des origines séparées ; runs et modèles suivis dans MLflow.
+- **Monitoring** : erreur réalisée de chaque prévision, MASE glissante sur 7 jours et seuil tiré
+  du backtest. En cas de dérive, un challenger prévoit en parallèle du champion et n'est promu que
+  s'il fait mieux sur les mêmes jours.
+- **Détection d'anomalies** : score robuste sur les résidus de prévision.
+- **Cloud et CI/CD** : infrastructure GCP en Terraform, API FastAPI sur Cloud Run redéployée à
+  chaque push, DAG Airflow et pipeline quotidien dans GitHub Actions, surveillé.
+- **Données ouvertes** : agrégats, prévisions et résultats du backtest publiés chaque jour dans la
+  [release gold](../../releases/tag/gold).
+- **Qualité** : 48 tests pytest, dont un faux serveur crates.io et une dérive simulée, CI et
+  pre-commit.
 
 ## Architecture
 
@@ -52,67 +80,25 @@ flowchart LR
         G["Gold<br/>total, catégories, 200 paquets"]
     end
     subgraph M["4. Prévision"]
-        F["LightGBM J+1 et J+7<br/>backtest glissant, MLflow"]
+        F["LightGBM J+1 et J+7<br/>backtest, MLflow, monitoring"]
     end
-    subgraph N["5. Service"]
+    subgraph R["5. Restitution"]
         X["API FastAPI<br/>sur Cloud Run"]
-    end
-    subgraph W["6. À venir"]
-        Y["Tableau de bord<br/>monitoring"]
+        Y["Tableau de bord<br/>GitHub Pages"]
     end
     A --- P
     D --- P
-    P --- SV --- G --- F --- X --- Y
-    classDef todo stroke-dasharray: 5 5
-    class Y todo
+    P --- SV --- G --- F
+    F --- X
+    F --- Y
 ```
 
-## Résultats du backtest
-
-MASE moyenne par série (sous 1, on bat le naïf saisonnier) sur 9 origines de validation,
-du 18 avril au 21 juin 2026, jamais utilisées pour concevoir le modèle. Le modèle global LightGBM
-est le meilleur sur les paquets et les catégories, soit l'essentiel des 260 séries, et en moyenne
-à chaque horizon. Sur le total, série unique et très régulière, ETS fait mieux : un modèle par
-série suffit là où la série est lisse. Le pipeline refait ce backtest chaque jour sur toutes les origines ;
-les tableaux à jour sont dans la [release gold](../../releases/tag/gold).
-
-| Série | Horizon | Naïf saisonnier | ETS | LightGBM | Gain de LightGBM |
-|---|---|---|---|---|---|
-| Total | J+1 | 0,746 | 0,502 | 0,558 | -11 % |
-| Total | J+7 | 0,741 | 0,648 | 0,679 | -5 % |
-| Catégories | J+1 | 1,034 | 0,949 | 0,878 | +7 % |
-| Catégories | J+7 | 1,074 | 1,100 | 0,992 | +8 % |
-| Paquets suivis | J+1 | 0,823 | 0,675 | 0,625 | +7 % |
-| Paquets suivis | J+7 | 1,028 | 1,140 | 1,007 | +2 % |
-
-### Intervalles de prédiction à 90 %
-
-Couverture mesurée sans fuite (le quantile de chaque origine ne vient que des précédentes), et
-demi-largeur de l'intervalle en part du niveau des 28 derniers jours :
-
-| Série | Couverture J+1 | Couverture J+7 | Demi-largeur J+1 | Demi-largeur J+7 |
-|---|---|---|---|---|
-| Total | 100 % | 100 % | 10 % | 16 % |
-| Catégories | 92 % | 92 % | 20 % | 25 % |
-| Paquets suivis | 96 % | 94 % | 12 % | 20 % |
-
-Sur le total, une seule série fournit peu d'erreurs pour calibrer : le quantile conformel, prudent,
-donne des intervalles plus larges que nécessaire.
-
-### Total : prévision directe ou ascendante
-
-MASE du total prévu directement, ou reconstitué en additionnant les prévisions des 200 paquets suivis
-et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'approche ascendante à J+7.
-
-| Modèle | J+1 direct | J+1 ascendant | J+7 direct | J+7 ascendant |
-|---|---|---|---|---|
-| Naïf saisonnier | 0,746 | 0,746 | 0,741 | 0,741 |
-| ETS | 0,502 | 0,512 | 0,648 | 0,740 |
-| LightGBM | 0,558 | 0,604 | 0,679 | 0,650 |
+Chaque jour à 5 h 17 UTC, après le dump de crates.io, GitHub Actions enchaîne ingestion, dbt,
+backtest, prévision, monitoring et anomalies, publie les fichiers, le tableau de bord et les
+données de BigQuery. Le même enchaînement est décrit par un DAG Airflow, testé en rejouant une
+semaine.
 
 ## API
-
-Déployée sur Cloud Run à chaque push, après le workflow Terraform, et documentée par OpenAPI :
 
 - `GET /forecast?series=paquet:serde` : prévisions J+1 et J+7 d'une série, avec leur intervalle à
   90 % ;
@@ -120,31 +106,34 @@ Déployée sur Cloud Run à chaque push, après le workflow Terraform, et docume
 - `GET /anomalies?days=30` : anomalies récentes ;
 - `GET /docs` : documentation interactive.
 
+```bash
+curl "https://pkgpulse-api-bnhde7a6fa-uc.a.run.app/forecast?series=paquet:serde"
+```
+
 ## Ce que disent les données
 
 - **La demande a été multipliée par 2,6** entre novembre 2025 et juin 2026 : de 382 à 1 008
   millions de téléchargements par jour, en moyenne mensuelle.
-- **La saisonnalité hebdomadaire est forte** : un dimanche pèse environ la moitié d'un mardi, et le
-  creux le plus profond tombe à Noël. Les tests de volume comparent donc chaque jour au même jour
-  des semaines précédentes.
-- **Une rupture de comptage** : fin octobre 2025, crates.io n'a plus compté que les
-  téléchargements faits par cargo. Le nombre de lignes quotidiennes est divisé par 2,5 à 4, d'où un
-  historique qui commence au 1er novembre 2025, dans un régime de comptage homogène.
-
+- **La saisonnalité hebdomadaire est forte** : un dimanche pèse environ la moitié d'un mardi.
 - **Le calendrier américain pèse** : les plus fortes anomalies tombent le 25 mai (Memorial Day)
   et le 7 septembre (Labor Day). La demande suit l'intégration continue des entreprises.
+- **Une rupture de comptage** : fin octobre 2025, crates.io n'a plus compté que les
+  téléchargements faits par cargo ; l'historique commence donc au 1er novembre 2025.
 
-## Avancement
+## Limites
 
-- [x] Ingestion bronze : archive, dump, jonction, données tardives
-- [x] Modèles dbt silver et gold, tests et snapshot
-- [x] Orchestration : DAG Airflow et exécution quotidienne planifiée
-- [x] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
-- [x] Détection d'anomalies
-- [x] Entrepôt BigQuery et infrastructure Terraform
-- [x] API FastAPI sur Cloud Run, redéployée à chaque push
-- [x] Monitoring : erreurs réalisées, MASE glissante, champion contre challenger
-- [ ] Tableau de bord en ligne
+- La validation couvre cinq mois, d'avril à septembre 2026, dans un seul régime de comptage.
+- Les jours fériés ne sont pas encore des variables du modèle, alors qu'ils causent les plus
+  fortes anomalies : c'est la prochaine amélioration.
+- Le backtest utilise les valeurs définitives ; en production, le dernier jour peut être corrigé
+  le lendemain. L'ingestion journalise chaque correction.
+- Les catégories actuelles des paquets sont appliquées à tout l'historique.
+- La comparaison directe contre ascendante ne porte que sur le total : les catégories ne sont pas
+  additives.
+- Le monitoring a démarré fin septembre 2026 : il lui faut 7 jours d'erreurs réalisées avant de
+  pouvoir déclencher un ré-entraînement.
+- GitHub Actions s'authentifie auprès de GCP par une clé de compte de service ; Workload Identity
+  Federation éviterait une clé de longue durée.
 
 ## Démarrage
 
@@ -155,38 +144,34 @@ make install   # environnement virtuel, dépendances et hooks pre-commit
 make check     # lint, tests et dbt sur un échantillon synthétique, comme la CI
 make ingest    # données réelles : archive depuis le 2025-11-01, puis dump du jour
 make dbt       # fraîcheur des sources, modèles silver et gold, tests et snapshot
-make backtest  # backtest glissant des références et de LightGBM, suivi dans MLflow
-make forecast  # prévisions J+1 et J+7 du modèle champion
-make monitor   # erreurs réalisées, dérive et règle champion contre challenger
-make anomalies # anomalies sur les résidus de prévision à J+1
-make api       # API en local sur les exports, documentation sur /docs
-make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
+make publish backtest forecast monitor anomalies  # exports, prévision et suivi
+make api       # API en local, documentation sur http://127.0.0.1:8000/docs
+make dashboard # données du tableau de bord, aperçu : python -m http.server -d site
 ```
 
 ## Organisation du dépôt
 
 ```text
-src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
-src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
+src/pkgpulse/ingest/    ingestion : archive, dump, jonction, contrats de schéma
+dbt/                    modèles silver et gold, tests, snapshot, profils DuckDB et BigQuery
+src/pkgpulse/forecast/  prévision : séries, références, LightGBM, backtest, MLflow
 src/pkgpulse/monitor/   monitoring : erreurs réalisées, dérive, champion contre challenger
 src/pkgpulse/anomalies/ détection d'anomalies sur les résidus de prévision
-src/pkgpulse/api/      API FastAPI : /forecast, /series, /anomalies
-infra/                 Terraform : bucket, datasets BigQuery, Artifact Registry
-airflow/dags/          DAG quotidien (dépendances, relances, backfill)
-dbt/                   modèles silver et gold, tests, snapshot
-tests/                 tests pytest, avec un faux serveur crates.io
-docs/                  cadrage et journal des décisions
-.github/workflows/     CI, pipeline quotidien, Terraform, déploiement, keepalive et surveillance
+src/pkgpulse/api/       API FastAPI : /forecast, /series, /anomalies
+site/                   tableau de bord statique
+infra/                  Terraform : bucket, datasets BigQuery, Artifact Registry
+airflow/dags/           DAG quotidien (dépendances, relances, backfill)
+tests/                  tests pytest
+docs/                   cadrage, journal des décisions, étude de cas
+.github/workflows/      CI, pipeline quotidien, Terraform, déploiement, keepalive et surveillance
 ```
 
 ## Documentation
 
 - [Cadrage](docs/cadrage.md) : séries prévues, horizons, ce que le modèle a le droit de savoir,
   métriques.
-- [Étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md) : un parcours presque complet
-  du registre, et ce que la détection d'anomalies trouve vraiment.
-- [Journal des décisions](docs/DECISIONS.md) : sources, contrats de schéma, idempotence, jonction,
-  tests dbt.
+- [Journal des décisions](docs/DECISIONS.md) : les 18 choix techniques et leurs raisons.
+- [Étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md).
 
 Données : dumps publics de crates.io, utilisés dans le respect de leur politique d'accès. Seuls des
 agrégats sont publiés.

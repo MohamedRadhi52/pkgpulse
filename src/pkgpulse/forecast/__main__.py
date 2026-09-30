@@ -7,7 +7,7 @@ import pandas as pd
 
 from pkgpulse.config import BACKTEST_PATH, DATA_DIR, EXPORT_DIR, HISTORY_PATH
 from pkgpulse.forecast import tracking
-from pkgpulse.forecast.backtest import mase_table, origins, run_backtest, scales
+from pkgpulse.forecast.backtest import mase_table, origins, run_backtest, scales, validation
 from pkgpulse.forecast.baselines import forecast_baselines
 from pkgpulse.forecast.conformal import coverage_table, quantiles
 from pkgpulse.forecast.hierarchy import bottom_up_table
@@ -26,11 +26,11 @@ def backtest() -> None:
     detail = ["unique_id", "level", "model", "origin", "h", "ds", "y", "y_hat", "mase_scale"]
     results[detail].round(3).to_csv(EXPORT_DIR / "backtest_results.csv", index=False)
 
-    mase = mase_table(results)
+    mase = mase_table(validation(results))
     tables = {
         "backtest_mase": mase.reset_index(),
         "backtest_coverage": coverage_table(results),
-        "backtest_bottom_up": bottom_up_table(results),
+        "backtest_bottom_up": bottom_up_table(validation(results)),
     }
     for name, table in tables.items():
         table.to_csv(EXPORT_DIR / f"{name}.csv", index=False)
