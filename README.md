@@ -25,7 +25,9 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
   manquante ou une clé en double arrête l'ingestion avant toute écriture.
 - **dbt en architecture médaillon** : 10 modèles, 33 tests (unicité, fraîcheur, jours manquants,
   chute de volume) et un snapshot qui garde l'historique des paquets.
-- **Qualité** : 28 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
+- **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
+  [release gold](../../releases/tag/gold), mis à jour par le pipeline.
+- **Qualité** : 29 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
   échantillon synthétique), pre-commit.
 
 ## Architecture

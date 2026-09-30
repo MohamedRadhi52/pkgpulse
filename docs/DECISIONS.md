@@ -152,3 +152,14 @@ du 2025-11-01 à aujourd'hui, pour que la fraîcheur et la fenêtre des paquets 
 aucune donnée brute n'est versionnée. Les données réelles ne passent que par le workflow du
 pipeline. Le SQL reste standard et passe par les macros inter-bases de dbt (`split_part`,
 `listagg`, `datediff`), pour préparer le profil BigQuery du lot 3.
+
+## 8. Publication des agrégats gold
+
+Les quatre tables gold (total, catégories, paquets suivis et leur classement) sont exportées en
+CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque exécution du pipeline.
+
+- Une release plutôt qu'un commit : les fichiers changent chaque jour et alourdiraient
+  l'historique git.
+- Seuls ces agrégats sont publiés, conformément à la politique d'accès de crates.io ; la couche
+  bronze reste dans le cache privé d'Actions.
+- Ces fichiers servent de source aux étapes de prévision, au tableau de bord et à l'API.

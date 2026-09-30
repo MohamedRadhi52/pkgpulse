@@ -1,8 +1,8 @@
 name: Pipeline quotidien
 
-# Ingestion réelle depuis static.crates.io puis dbt. Les données (couche bronze, entrepôt DuckDB
-# et son snapshot) sont conservées d'une exécution à l'autre dans le cache d'Actions : seuls les
-# jours nouveaux ou corrigés sont réécrits.
+# Ingestion réelle depuis static.crates.io, dbt, puis publication des agrégats gold dans la
+# release gold. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
+# exécution à l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
 on:
   push:
     branches: [main]
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # mise à jour des fichiers de la release gold
 
 concurrency:
   group: daily
@@ -51,6 +51,16 @@ jobs:
 
       - name: dbt (fraîcheur, modèles, tests, snapshot)
         run: make dbt 2>&1 | tee dbt.log
+
+      - name: Publication des agrégats gold
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          make publish
+          gh release view gold > /dev/null 2>&1 || gh release create gold \
+            --title "Agrégats quotidiens" \
+            --notes "Téléchargements quotidiens de crates.io agrégés (total, catégories, paquets suivis), mis à jour par le pipeline quotidien. Source : dumps publics de crates.io."
+          gh release upload gold data/export/*.csv --clobber
 
       # Les écritures sont atomiques : même après un échec, l'état est cohérent et la prochaine
       # exécution reprend là où celle-ci s'est arrêtée.
