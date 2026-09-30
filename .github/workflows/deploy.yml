@@ -56,6 +56,7 @@ jobs:
       - name: Vérification de l'URL publique
         run: |
           url=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
-          curl -fsS --retry 5 --retry-all-errors "$url/health"
+          # Réponse jetée : sans retour à la ligne, elle masquerait l'annotation qui suit.
+          curl -fsS --retry 5 --retry-all-errors -o /dev/null "$url/health"
           status=$(curl -s -o /dev/null -w '%{http_code}' "$url/forecast")
           echo "::notice title=API::$url (GET /forecast : HTTP $status)"
