@@ -180,3 +180,18 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
 - Alertes : un échec du pipeline déclenche l'e-mail de GitHub ; un workflow de surveillance
   quotidien échoue, et alerte à son tour, si le pipeline n'a pas réussi depuis 30 heures, ce qui
   couvre aussi une exécution qui n'a jamais démarré.
+
+## 10. Backtest à origine glissante et MASE
+
+- Une origine tous les 8 jours, du 2026-03-01 au dernier jour où J+7 est observable (26 origines
+  au 29 septembre 2026). Avec un pas de 7 jours, toutes les origines tomberaient un dimanche : J+1
+  serait toujours un lundi et J+7 toujours un dimanche, deux jours de niveaux très différents, ce
+  qui fausserait la comparaison entre horizons.
+- À chaque origine, un modèle ne reçoit que les données antérieures ou égales à l'origine. Deux
+  tests le vérifient : un modèle espion qui note la dernière date reçue, et des valeurs futures
+  empoisonnées qui ne doivent rien changer aux prévisions.
+- MASE : erreur absolue divisée par l'erreur moyenne du naïf saisonnier sur l'historique
+  d'entraînement, moyennée par série puis par niveau. Elle reste définie avec des zéros, compare
+  des séries d'échelles différentes et se lit directement : sous 1, on bat le naïf saisonnier.
+- Références : naïf saisonnier (même jour de la semaine précédente) et AutoETS (saisonnalité de 7
+  jours) de statsforecast. statsforecast impose pandas < 3 : pandas est épinglé en 2.3.3.

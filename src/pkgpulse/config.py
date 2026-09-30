@@ -6,6 +6,7 @@ from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("PKGPULSE_DATA_DIR", "data"))
 BRONZE_DIR = DATA_DIR / "bronze"
+EXPORT_DIR = DATA_DIR / "export"
 
 SOURCE_URL = "https://static.crates.io"
 USER_AGENT = "pkgpulse/0.1 (daily analytics on crates.io public download data)"

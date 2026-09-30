@@ -8,7 +8,7 @@ DBT_FLAGS := --project-dir dbt --profiles-dir dbt
 # Chemin absolu : l'ingestion et dbt lisent les mêmes données, quel que soit le dossier courant.
 export PKGPULSE_DATA_DIR = $(abspath $(DATA_DIR))
 
-.PHONY: install lint format test ingest dbt publish sample check airflow-test
+.PHONY: install lint format test ingest dbt publish backtest sample check airflow-test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -39,6 +39,10 @@ dbt:
 # Agrégats gold en CSV dans $(DATA_DIR)/export, publiés par le pipeline dans la release gold.
 publish:
 	$(BIN)/python -m pkgpulse.publish
+
+# Backtest glissant sur les exports gold ; tableaux de résultats dans $(DATA_DIR)/export.
+backtest:
+	$(BIN)/python -m pkgpulse.forecast backtest
 
 # Données synthétiques au format bronze : dbt tourne sans télécharger crates.io.
 sample:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import duckdb
 
-from pkgpulse.config import DATA_DIR
+from pkgpulse.config import DATA_DIR, EXPORT_DIR
 
 TABLES = ["gold_daily_total", "gold_daily_category", "gold_daily_crate", "gold_top_crates"]
 
@@ -23,4 +23,4 @@ def export_gold(warehouse: Path, out_dir: Path) -> list[Path]:
 
 
 if __name__ == "__main__":
-    export_gold(DATA_DIR / "warehouse.duckdb", DATA_DIR / "export")
+    export_gold(DATA_DIR / "warehouse.duckdb", EXPORT_DIR)

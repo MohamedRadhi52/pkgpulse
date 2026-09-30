@@ -9,6 +9,8 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 
 
@@ -123,3 +125,27 @@ def crates_io(tmp_path):
     yield FakeCratesIo(root, f"http://127.0.0.1:{server.server_port}")
     server.shutdown()
     server.server_close()
+
+
+@pytest.fixture
+def series():
+    """Deux paquets et la série autres, avec saisonnalité hebdomadaire ; le total est leur somme."""
+    rng = np.random.default_rng(0)
+    ds = pd.date_range("2026-01-01", periods=140, freq="D")
+    weekly = np.where(ds.dayofweek >= 5, 0.5, 1.0)
+    parts = {"paquet:a": (1000, "paquet"), "paquet:b": (400, "paquet"), "autres": (3000, "autres")}
+    frames = [
+        pd.DataFrame(
+            {
+                "unique_id": uid,
+                "level": level,
+                "ds": ds,
+                "y": base * weekly * rng.uniform(0.9, 1.1, len(ds)),
+                "versions_published": 0.0,
+            }
+        )
+        for uid, (base, level) in parts.items()
+    ]
+    total = sum(frame["y"].to_numpy() for frame in frames)
+    frames.append(frames[0].assign(unique_id="total", level="total", y=total))
+    return pd.concat(frames, ignore_index=True).sort_values(["unique_id", "ds"], ignore_index=True)

@@ -60,8 +60,8 @@ Deux approximations sont assumées et mesurées :
 
 ## Protocole d'évaluation
 
-- Backtest à origine glissante : une origine par semaine à partir du 1er mars 2026, jusqu'au
-  dernier jour disponible. À chaque origine, un modèle n'est entraîné que sur les données
+- Backtest à origine glissante : une origine tous les 8 jours à partir du 1er mars 2026, pour que
+  chaque jour de la semaine serve tour à tour d'origine, jusqu'au dernier jour disponible. À chaque origine, un modèle n'est entraîné que sur les données
   antérieures ou égales à l'origine.
 - Références : naïf saisonnier et ETS.
 - Deux niveaux de prévision comparés : prévision directe d'un agrégat (total, catégorie) contre
