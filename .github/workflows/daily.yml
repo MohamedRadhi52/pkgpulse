@@ -112,6 +112,6 @@ jobs:
             echo "::warning title=Ingestion::réussie après une relance automatique"
           fi
           if grep -qs -e "Failure in" -e "Error in" dbt.log dbt-bigquery.log; then
-            errors=$(grep -hs -e 'Failure in' -e 'Error in' dbt.log dbt-bigquery.log | head -n 5)
+            errors=$(grep -hs -A 2 -e 'Failure in' -e 'Error in' dbt.log dbt-bigquery.log | head -n 15)
             echo "::error title=dbt::$(echo "$errors" | tr '\n' ' ')"
           fi

@@ -271,6 +271,9 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   Le pipeline copie la couche bronze et les exports dans Cloud Storage ; une macro dbt y crée les
   tables externes du bronze, puis `dbt build` construit silver, gold et le snapshot dans BigQuery.
   Volume estimé : quelques Go lus par jour pour 1 To gratuit par mois, moins de 1 Go stocké.
+- Premier passage sur BigQuery : un seul modèle a échoué, `silver_crate_downloads`, où la table
+  portait le nom d'une de ses colonnes (`downloads`). DuckDB l'accepte ; BigQuery résout d'abord
+  le nom comme une colonne. Les alias de tables ne reprennent plus jamais un nom de colonne.
 - Les résultats détaillés du backtest (une ligne par série, origine, horizon et modèle) sont
   désormais exportés avec les autres fichiers, pour recalculer les tableaux du README.
 
