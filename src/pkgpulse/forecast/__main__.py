@@ -10,6 +10,7 @@ from pkgpulse.forecast import tracking
 from pkgpulse.forecast.backtest import HORIZONS, mase_table, origins, run_backtest
 from pkgpulse.forecast.baselines import forecast_baselines
 from pkgpulse.forecast.conformal import coverage_table, quantiles
+from pkgpulse.forecast.hierarchy import bottom_up_table
 from pkgpulse.forecast.lgbm import fit_models, forecast_lgbm, predict
 from pkgpulse.forecast.series import load_series
 
@@ -29,6 +30,7 @@ def backtest() -> None:
     tables = {
         "backtest_mase": mase.reset_index(),
         "backtest_coverage": coverage_table(results),
+        "backtest_bottom_up": bottom_up_table(results),
     }
     for name, table in tables.items():
         table.to_csv(EXPORT_DIR / f"{name}.csv", index=False)

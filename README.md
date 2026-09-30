@@ -93,6 +93,17 @@ demi-largeur de l'intervalle en part du niveau des 28 derniers jours :
 Sur le total, une seule série fournit peu d'erreurs pour calibrer : le quantile conformel, prudent,
 donne des intervalles plus larges que nécessaire.
 
+### Total : prévision directe ou ascendante
+
+MASE du total prévu directement, ou reconstitué en additionnant les prévisions des 200 paquets suivis
+et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'approche ascendante à J+7.
+
+| Modèle | J+1 direct | J+1 ascendant | J+7 direct | J+7 ascendant |
+|---|---|---|---|---|
+| Naïf saisonnier | 0,746 | 0,746 | 0,741 | 0,741 |
+| ETS | 0,502 | 0,512 | 0,648 | 0,740 |
+| LightGBM | 0,558 | 0,604 | 0,679 | 0,650 |
+
 ## Ce que disent les données
 
 - **La demande a été multipliée par 2,6** entre novembre 2025 et juin 2026 : de 382 à 1 008

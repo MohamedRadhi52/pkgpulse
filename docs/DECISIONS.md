@@ -232,3 +232,11 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   fériés et forte croissance la mettent à l'épreuve. La couverture est donc mesurée sans fuite : à
   chaque origine, le quantile ne vient que des origines précédentes, après quatre origines de
   chauffe.
+
+## 13. Deux niveaux de prévision : direct contre ascendant
+
+- La série autres (total moins les 200 paquets suivis) rend la hiérarchie exactement additive :
+  total = somme des paquets suivis + autres. On compare la MASE du total prévu directement et celle
+  de la somme des prévisions de ses parties, pour chaque modèle et chaque horizon.
+- Les catégories ne sont pas additives (un paquet peut en avoir plusieurs) : elles restent hors de
+  cette comparaison. La réconciliation complète (MinT et variantes) est hors périmètre.
