@@ -251,3 +251,25 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   2026 (Memorial Day) concentre 238 séries et le 7 septembre (Labor Day) 42, avec un écho une
   semaine plus tard.
 - Étude de cas : [docs/etude-de-cas-21-juin-2026.md](etude-de-cas-21-juin-2026.md).
+
+## 15. Cloud : amorçage à la main, le reste dans Terraform
+
+- Fait une fois à la main (amorçage) : le projet GCP, la facturation, une alerte de budget à 5 €,
+  l'activation des API et le compte de service de la CI, avec sept rôles précis plutôt que le rôle
+  propriétaire. Sa clé est dans les secrets du dépôt ; Workload Identity Federation éviterait une
+  clé de longue durée, c'est l'amélioration suivante.
+- Dans Terraform (`infra/`) : le bucket des données, les quatre datasets BigQuery (bronze, silver,
+  gold, snapshots), le dépôt Artifact Registry avec une règle qui ne garde que les deux dernières
+  images (offre gratuite de 0,5 Go), et le compte de service de l'API, en lecture seule sur le
+  bucket. L'état est dans un bucket créé par le workflow s'il n'existe pas.
+- Le workflow Terraform tourne à chaque push sur main : sans changement, il vérifie l'absence de
+  dérive. `gh workflow run terraform.yml -f destroy=true` supprime tout après les candidatures ;
+  `gcloud projects delete` reste l'option radicale.
+- Tout est en us-central1 : l'offre gratuite de Cloud Storage n'existe que dans trois régions des
+  États-Unis, et BigQuery doit être dans la même région que le bucket qu'il lit.
+- Le même projet dbt tourne sur DuckDB (local, CI, pipeline) et sur BigQuery (cible `bigquery`).
+  Le pipeline copie la couche bronze et les exports dans Cloud Storage ; une macro dbt y crée les
+  tables externes du bronze, puis `dbt build` construit silver, gold et le snapshot dans BigQuery.
+  Volume estimé : quelques Go lus par jour pour 1 To gratuit par mois, moins de 1 Go stocké.
+- Les résultats détaillés du backtest (une ligne par série, origine, horizon et modèle) sont
+  désormais exportés avec les autres fichiers, pour recalculer les tableaux du README.

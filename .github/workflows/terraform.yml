@@ -1,0 +1,63 @@
+name: Terraform
+
+# À chaque push sur main : plan et application (sans changement la plupart du temps, ce qui vérifie
+# aussi l'absence de dérive). Le déploiement de l'API suit, une fois ce workflow réussi.
+# Suppression complète après les candidatures : gh workflow run terraform.yml -f destroy=true
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: "Tout supprimer : service Cloud Run puis ressources Terraform"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform
+  cancel-in-progress: false
+
+env:
+  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+
+defaults:
+  run:
+    shell: bash
+    working-directory: infra
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - uses: hashicorp/setup-terraform@v4
+
+      - name: Bucket de l'état Terraform
+        run: |
+          state="gs://$TF_VAR_project_id-tfstate"
+          gcloud storage buckets describe "$state" > /dev/null 2>&1 \
+            || gcloud storage buckets create "$state" --location "$REGION" --uniform-bucket-level-access
+
+      - run: terraform init -input=false -backend-config="bucket=$TF_VAR_project_id-tfstate"
+      - run: terraform fmt -check -diff
+      - run: terraform validate
+
+      - name: Application
+        if: ${{ !inputs.destroy }}
+        run: terraform apply -input=false -auto-approve
+
+      - name: Suppression complète
+        if: ${{ inputs.destroy }}
+        run: |
+          if gcloud run services describe pkgpulse-api --region "$REGION" > /dev/null 2>&1; then
+            gcloud run services delete pkgpulse-api --region "$REGION" --quiet
+          fi
+          terraform destroy -input=false -auto-approve

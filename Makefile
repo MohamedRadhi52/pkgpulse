@@ -8,7 +8,7 @@ DBT_FLAGS := --project-dir dbt --profiles-dir dbt
 # Chemin absolu : l'ingestion et dbt lisent les mêmes données, quel que soit le dossier courant.
 export PKGPULSE_DATA_DIR = $(abspath $(DATA_DIR))
 
-.PHONY: install lint format test ingest dbt publish backtest forecast anomalies sample check airflow-test
+.PHONY: install lint format test ingest dbt dbt-bigquery publish backtest forecast anomalies sample check airflow-test
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -35,6 +35,13 @@ ingest:
 dbt:
 	$(BIN)/dbt source freshness $(DBT_FLAGS)
 	$(BIN)/dbt build $(DBT_FLAGS)
+
+# Le même projet dbt sur BigQuery : tables externes sur la couche bronze copiée dans Cloud Storage,
+# puis build. Demande des identifiants GCP et la variable GCP_PROJECT_ID.
+dbt-bigquery:
+	$(BIN)/dbt run-operation create_bronze_tables --args '{bucket: $(GCP_PROJECT_ID)-pkgpulse}' \
+		--target bigquery $(DBT_FLAGS)
+	$(BIN)/dbt build --target bigquery $(DBT_FLAGS)
 
 # Agrégats gold en CSV dans $(DATA_DIR)/export, publiés par le pipeline dans la release gold.
 publish:

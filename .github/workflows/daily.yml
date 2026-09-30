@@ -1,7 +1,7 @@
 name: Pipeline quotidien
 
-# Ingestion réelle depuis static.crates.io, dbt, backtest et prévision, puis publication des
-# agrégats et des prévisions dans la release gold. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
+# Ingestion réelle depuis static.crates.io, dbt, backtest et prévision, publication des agrégats
+# et des prévisions dans la release gold, puis copie dans Cloud Storage et dbt sur BigQuery. Les données (couche bronze, entrepôt DuckDB et son snapshot) sont conservées d'une
 # exécution à l'autre dans le cache d'Actions : seuls les jours nouveaux ou corrigés sont réécrits.
 on:
   schedule:
@@ -73,6 +73,23 @@ jobs:
             --notes "Téléchargements quotidiens de crates.io agrégés (total, catégories, paquets suivis), prévisions et résultats du backtest, mis à jour par le pipeline quotidien. Source : dumps publics de crates.io."
           gh release upload gold data/export/*.csv --clobber
 
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # La couche bronze et les exports vont dans Cloud Storage : BigQuery y lit le bronze par des
+      # tables externes, et l'API y lit les prévisions.
+      - name: Cloud Storage et dbt sur BigQuery
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          bucket="gs://$GCP_PROJECT_ID-pkgpulse"
+          gcloud storage rsync data/bronze "$bucket/bronze" --recursive \
+            --delete-unmatched-destination-objects --exclude '.*\.tmp$'
+          gcloud storage cp data/export/*.csv "$bucket/export/"
+          make dbt-bigquery 2>&1 | tee dbt-bigquery.log
+
       # Les écritures sont atomiques : même après un échec, l'état est cohérent et la prochaine
       # exécution reprend là où celle-ci s'est arrêtée.
       - name: Sauvegarder les données
@@ -85,13 +102,16 @@ jobs:
       - name: Bilan
         if: always()
         run: |
-          grep -hs -e "Bilan" -e "Done. PASS" ingest.log dbt.log forecast.log \
-            | sed 's/^[0-9: ,-]*/::notice title=Bilan::/' || true
+          for log in ingest dbt forecast dbt-bigquery; do
+            grep -s -e "Bilan" -e "Done. PASS" "$log.log" \
+              | sed "s/^[0-9: ,-]*/::notice title=$log::/" || true
+          done
           if [ "${{ steps.ingest.outcome }}" = failure ]; then
             echo "::error title=Ingestion::$(tail -n 3 ingest.log | tr '\n' ' ')"
           elif grep -qs "Traceback" ingest.log; then
             echo "::warning title=Ingestion::réussie après une relance automatique"
           fi
-          if grep -qs -e "Failure in" -e "Error in" dbt.log; then
-            echo "::error title=dbt::$(grep -hs -e 'Failure in' -e 'Error in' dbt.log | head -n 5 | tr '\n' ' ')"
+          if grep -qs -e "Failure in" -e "Error in" dbt.log dbt-bigquery.log; then
+            errors=$(grep -hs -e 'Failure in' -e 'Error in' dbt.log dbt-bigquery.log | head -n 5)
+            echo "::error title=dbt::$(echo "$errors" | tr '\n' ' ')"
           fi

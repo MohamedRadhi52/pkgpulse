@@ -5,3 +5,12 @@ pkgpulse:
       type: duckdb
       path: "{{ env_var('PKGPULSE_DATA_DIR', 'data') }}/warehouse.duckdb"
       threads: 4
+    # Le même projet sur BigQuery, avec les identifiants Google par défaut : ceux du compte de
+    # service dans GitHub Actions.
+    bigquery:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID', 'non-configure') }}"
+      dataset: gold
+      location: us-central1
+      threads: 4

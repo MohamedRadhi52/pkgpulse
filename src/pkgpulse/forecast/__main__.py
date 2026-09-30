@@ -25,6 +25,8 @@ def backtest() -> None:
     results = run_backtest(series, origins(series), [forecast_baselines, forecast_lgbm])
     BACKTEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     results.to_parquet(BACKTEST_PATH)
+    detail = ["unique_id", "level", "model", "origin", "h", "ds", "y", "y_hat", "mase_scale"]
+    results[detail].round(3).to_csv(EXPORT_DIR / "backtest_results.csv", index=False)
 
     mase = mase_table(results)
     tables = {

@@ -47,7 +47,7 @@ flowchart LR
     subgraph B["2. Bronze"]
         P["Parquet, un fichier par jour<br/>contrats de schéma, empreinte MD5"]
     end
-    subgraph T["3. dbt sur DuckDB"]
+    subgraph T["3. dbt sur DuckDB et BigQuery"]
         SV["Silver<br/>typage, jointures"]
         G["Gold<br/>total, catégories, 200 paquets"]
     end
@@ -128,7 +128,7 @@ et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'
 - [x] Orchestration : DAG Airflow et exécution quotidienne planifiée
 - [x] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
 - [x] Détection d'anomalies
-- [ ] Entrepôt BigQuery et infrastructure Terraform
+- [x] Entrepôt BigQuery et infrastructure Terraform
 - [ ] API FastAPI sur Cloud Run et tableau de bord en ligne
 
 ## Démarrage
@@ -152,11 +152,12 @@ make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
 src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
 src/pkgpulse/anomalies/ détection d'anomalies sur les résidus de prévision
+infra/                 Terraform : bucket, datasets BigQuery, Artifact Registry
 airflow/dags/          DAG quotidien (dépendances, relances, backfill)
 dbt/                   modèles silver et gold, tests, snapshot
 tests/                 tests pytest, avec un faux serveur crates.io
 docs/                  cadrage et journal des décisions
-.github/workflows/     CI, pipeline quotidien, keepalive et surveillance
+.github/workflows/     CI, pipeline quotidien, Terraform, keepalive et surveillance
 ```
 
 ## Documentation
