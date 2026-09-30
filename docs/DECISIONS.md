@@ -222,3 +222,13 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   dernière version : elle ne s'arrête jamais faute de modèle.
 - Une prévision datée (backfill du DAG) réentraîne les modèles sur les seules données connues à
   l'origine, pour ne pas utiliser un modèle qui a vu la suite.
+
+## 12. Intervalles de prédiction conformels
+
+- Erreur normalisée : écart absolu divisé par le niveau des 28 derniers jours. Pour chaque niveau
+  et horizon, le quantile conformel des erreurs du backtest, avec la correction d'échantillon fini,
+  donne la demi-largeur : intervalle = prévision plus ou moins quantile fois niveau, borné à zéro.
+- La garantie de couverture (au moins 90 % en moyenne) suppose des erreurs échangeables ; jours
+  fériés et forte croissance la mettent à l'épreuve. La couverture est donc mesurée sans fuite : à
+  chaque origine, le quantile ne vient que des origines précédentes, après quatre origines de
+  chauffe.

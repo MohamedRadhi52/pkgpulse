@@ -26,8 +26,8 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
 - **dbt en architecture médaillon** : 10 modèles, 33 tests (unicité, fraîcheur, jours manquants,
   chute de volume) et un snapshot qui garde l'historique des paquets.
 - **Prévision J+1 et J+7** : un modèle LightGBM global par horizon, appris sur 260 séries à la
-  fois, comparé au naïf saisonnier et à ETS en backtest glissant, avec un test anti-fuite. Runs et
-  modèles suivis dans MLflow, avec un alias champion.
+  fois, comparé au naïf saisonnier et à ETS en backtest glissant, avec un test anti-fuite. Intervalles
+  conformels à 90 %, runs et modèles suivis dans MLflow avec un alias champion.
 - **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
   [release gold](../../releases/tag/gold), mis à jour par le pipeline.
 - **Qualité** : 38 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
@@ -79,6 +79,20 @@ les tableaux à jour sont dans la [release gold](../../releases/tag/gold).
 | Paquets suivis | J+1 | 0,823 | 0,675 | 0,625 | +7 % |
 | Paquets suivis | J+7 | 1,028 | 1,140 | 1,007 | +2 % |
 
+### Intervalles de prédiction à 90 %
+
+Couverture mesurée sans fuite (le quantile de chaque origine ne vient que des précédentes), et
+demi-largeur de l'intervalle en part du niveau des 28 derniers jours :
+
+| Série | Couverture J+1 | Couverture J+7 | Demi-largeur J+1 | Demi-largeur J+7 |
+|---|---|---|---|---|
+| Total | 100 % | 100 % | 10 % | 16 % |
+| Catégories | 92 % | 92 % | 20 % | 25 % |
+| Paquets suivis | 96 % | 94 % | 12 % | 20 % |
+
+Sur le total, une seule série fournit peu d'erreurs pour calibrer : le quantile conformel, prudent,
+donne des intervalles plus larges que nécessaire.
+
 ## Ce que disent les données
 
 - **La demande a été multipliée par 2,6** entre novembre 2025 et juin 2026 : de 382 à 1 008
@@ -95,7 +109,7 @@ les tableaux à jour sont dans la [release gold](../../releases/tag/gold).
 - [x] Ingestion bronze : archive, dump, jonction, données tardives
 - [x] Modèles dbt silver et gold, tests et snapshot
 - [x] Orchestration : DAG Airflow et exécution quotidienne planifiée
-- [ ] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
+- [x] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
 - [ ] Détection d'anomalies
 - [ ] Entrepôt BigQuery et infrastructure Terraform
 - [ ] API FastAPI sur Cloud Run et tableau de bord en ligne

@@ -9,6 +9,7 @@ from pkgpulse.config import DATA_DIR, EXPORT_DIR
 from pkgpulse.forecast import tracking
 from pkgpulse.forecast.backtest import HORIZONS, mase_table, origins, run_backtest
 from pkgpulse.forecast.baselines import forecast_baselines
+from pkgpulse.forecast.conformal import coverage_table, quantiles
 from pkgpulse.forecast.lgbm import fit_models, forecast_lgbm, predict
 from pkgpulse.forecast.series import load_series
 
@@ -27,6 +28,7 @@ def backtest() -> None:
     mase = mase_table(results)
     tables = {
         "backtest_mase": mase.reset_index(),
+        "backtest_coverage": coverage_table(results),
     }
     for name, table in tables.items():
         table.to_csv(EXPORT_DIR / f"{name}.csv", index=False)
@@ -51,7 +53,7 @@ def beats_baselines(mase: pd.DataFrame) -> bool:
 
 
 def forecast(origin: pd.Timestamp | None) -> None:
-    """Prévisions J+1 et J+7 de chaque série."""
+    """Prévisions J+1 et J+7 de chaque série, avec intervalles conformels à 90 %."""
     series = load_series(EXPORT_DIR)
     tracking.setup(DATA_DIR)
     if origin is None:
@@ -65,8 +67,14 @@ def forecast(origin: pd.Timestamp | None) -> None:
     preds["h"] = (preds["ds"] - origin).dt.days
 
     levels = series.drop_duplicates("unique_id")[["unique_id", "level"]]
-    preds = preds.merge(levels, on="unique_id")
-    columns = ["unique_id", "level", "origin", "ds", "h", "y_hat"]
+    results = pd.read_parquet(BACKTEST_PATH)
+    widths = quantiles(results[results["origin"] < origin]).query("model == 'lightgbm'")
+    preds = preds.merge(levels, on="unique_id").merge(
+        widths[["level", "h", "q"]], on=["level", "h"]
+    )
+    preds["lower"] = (preds["y_hat"] - preds["q"] * preds["scale"]).clip(lower=0)
+    preds["upper"] = preds["y_hat"] + preds["q"] * preds["scale"]
+    columns = ["unique_id", "level", "origin", "ds", "h", "y_hat", "lower", "upper"]
     preds = preds.assign(origin=origin)[columns].round(0)
     preds.to_csv(EXPORT_DIR / "forecasts.csv", index=False)
     log.info(
