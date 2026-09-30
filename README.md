@@ -15,12 +15,16 @@ surveille sa propre erreur et détecte les anomalies. Le problème est celui de 
 demande dans le retail : saisonnalité hebdomadaire, zéros, effets de nouvelles versions, pics
 exogènes.
 
+**Stack** : Python 3.14, DuckDB, dbt, BigQuery, LightGBM, statsforecast, MLflow, FastAPI, Docker,
+Cloud Run, Terraform, Airflow, GitHub Actions.
+
 ![Téléchargements quotidiens sur crates.io](docs/img/telechargements_quotidiens.png)
 
 ## Résultats
 
 MASE moyenne par série sur 20 origines de validation, du 18 avril au 17 septembre 2026, jamais
-utilisées pour concevoir le modèle. Sous 1, on bat le naïf saisonnier.
+utilisées pour concevoir le modèle. Sous 1, on bat le naïf saisonnier. Chiffres du 30 septembre
+2026 ; le pipeline les recalcule chaque jour dans la [release gold](../../releases/tag/gold).
 
 | Série | Horizon | Naïf saisonnier | ETS | LightGBM | Gain sur la meilleure référence |
 |---|---|---|---|---|---|
@@ -41,27 +45,23 @@ utilisées pour concevoir le modèle. Sous 1, on bat le naïf saisonnier.
 
 ## Points clés
 
-- **Ingestion idempotente** : un jour correspond à un fichier Parquet remplacé de façon atomique.
-  Relancer ne crée jamais de doublon ; une exécution interrompue reprend au premier jour manquant,
-  ce qui a servi pour de vrai après une erreur HTTP 500 de crates.io.
-- **Données tardives** : l'archive, définitive mais en retard de trois mois, et le dump quotidien
-  des 90 derniers jours sont joints par une règle testée.
-- **Contrats de schéma** : crates.io ne garantit pas son schéma ; une colonne manquante ou une clé
-  en double arrête l'ingestion avant toute écriture.
-- **dbt en architecture médaillon**, sur DuckDB et sur BigQuery : 10 modèles, 33 tests (unicité,
-  fraîcheur, jours manquants, chute de volume) et un snapshot de l'historique des paquets.
-- **Prévision** : un modèle LightGBM global par horizon, appris sur les 260 séries, comparé au
-  naïf saisonnier et à ETS en backtest glissant, avec des tests anti-fuite. Conception et
-  validation sur des origines séparées ; runs et modèles suivis dans MLflow.
-- **Monitoring** : erreur réalisée de chaque prévision, MASE glissante sur 7 jours et seuil tiré
-  du backtest. En cas de dérive, un challenger prévoit en parallèle du champion et n'est promu que
-  s'il fait mieux sur les mêmes jours.
-- **Détection d'anomalies** : score robuste sur les résidus de prévision.
+- **Ingestion idempotente et données tardives** : un jour correspond à un fichier Parquet remplacé
+  de façon atomique ; l'archive définitive et le dump des 90 derniers jours sont joints par une
+  règle testée. Une relance ne crée jamais de doublon, ce qui a servi pour de vrai après une
+  erreur HTTP 500 de crates.io.
+- **Qualité des données** : contrats de schéma à l'ingestion, dbt en architecture médaillon sur
+  DuckDB et BigQuery (10 modèles, 33 tests dont fraîcheur, jours manquants et chute de volume) et
+  snapshot de l'historique des paquets.
+- **Prévision** : un LightGBM global par horizon pour 260 séries, comparé au naïf saisonnier et à
+  ETS en backtest glissant ; conception et validation sur des origines séparées, tests anti-fuite,
+  intervalles conformels et suivi MLflow.
+- **MLOps** : erreur réalisée et MASE glissante chaque jour, seuil de dérive tiré du backtest, et
+  challenger en mode fantôme, promu seulement s'il fait mieux que le champion.
 - **Cloud et CI/CD** : infrastructure GCP en Terraform, API FastAPI sur Cloud Run redéployée à
-  chaque push, DAG Airflow et pipeline quotidien dans GitHub Actions, surveillé.
+  chaque push, pipeline quotidien dans GitHub Actions et DAG Airflow équivalent, surveillés.
 - **Données ouvertes** : agrégats, prévisions et résultats du backtest publiés chaque jour dans la
   [release gold](../../releases/tag/gold).
-- **Qualité** : 48 tests pytest, dont un faux serveur crates.io et une dérive simulée, CI et
+- **Code testé** : 48 tests pytest, dont un faux serveur crates.io et une dérive simulée, CI et
   pre-commit.
 
 ## Architecture
@@ -112,7 +112,7 @@ curl "https://pkgpulse-api-bnhde7a6fa-uc.a.run.app/forecast?series=paquet:serde"
 
 ## Ce que disent les données
 
-- **La demande a été multipliée par 2,6** entre novembre 2025 et juin 2026 : de 382 à 1 008
+- **La demande a été multipliée par 3,8** entre novembre 2025 et septembre 2026 : de 382 à 1 464
   millions de téléchargements par jour, en moyenne mensuelle.
 - **La saisonnalité hebdomadaire est forte** : un dimanche pèse environ la moitié d'un mardi.
 - **Le calendrier américain pèse** : les plus fortes anomalies tombent le 25 mai (Memorial Day)
@@ -174,4 +174,4 @@ docs/                   cadrage, journal des décisions, étude de cas
 - [Étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md).
 
 Données : dumps publics de crates.io, utilisés dans le respect de leur politique d'accès. Seuls des
-agrégats sont publiés.
+agrégats sont publiés. Code sous licence MIT.
