@@ -240,3 +240,14 @@ CSV triés et publiées dans la release `gold` du dépôt, remplacées à chaque
   de la somme des prévisions de ses parties, pour chaque modèle et chaque horizon.
 - Les catégories ne sont pas additives (un paquet peut en avoir plusieurs) : elles restent hors de
   cette comparaison. La réconciliation complète (MinT et variantes) est hors périmètre.
+
+## 14. Détection d'anomalies
+
+- Résidus à J+1 du modèle LightGBM, réentraîné tous les 8 jours et appliqué chaque jour. Chaque
+  résidu est comparé aux 56 jours précédents de la même série par un score robuste : écart à la
+  médiane divisé par 1,4826 fois la MAD. Au-delà de 4, le jour est un pic ou un creux.
+- Sur les données réelles, de mars à septembre 2026 : 447 jours signalés sur 55 120 résidus
+  (0,8 %), presque tous sur des paquets et des catégories ; le total ne l'est qu'une fois. Le 25 mai
+  2026 (Memorial Day) concentre 238 séries et le 7 septembre (Labor Day) 42, avec un écho une
+  semaine plus tard.
+- Étude de cas : [docs/etude-de-cas-21-juin-2026.md](etude-de-cas-21-juin-2026.md).

@@ -61,8 +61,8 @@ jobs:
       - name: Export des agrégats gold
         run: make publish
 
-      - name: Backtest et prévision
-        run: make backtest forecast 2>&1 | tee forecast.log
+      - name: Backtest, prévision et anomalies
+        run: make backtest forecast anomalies 2>&1 | tee forecast.log
 
       - name: Publication dans la release gold
         env:

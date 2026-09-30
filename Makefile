@@ -48,6 +48,10 @@ backtest:
 forecast:
 	$(BIN)/python -m pkgpulse.forecast predict $(if $(ORIGIN),--origin $(ORIGIN))
 
+# Anomalies sur les résidus de prévision à J+1, exportées dans $(DATA_DIR)/export.
+anomalies:
+	$(BIN)/python -m pkgpulse.anomalies
+
 # Données synthétiques au format bronze : dbt tourne sans télécharger crates.io.
 sample:
 	$(BIN)/python -m pkgpulse.sample $(SAMPLE_DIR)

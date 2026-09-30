@@ -28,6 +28,9 @@ séries avec des zéros, effets de nouvelles versions, pics exogènes.
 - **Prévision J+1 et J+7** : un modèle LightGBM global par horizon, appris sur 260 séries à la
   fois, comparé au naïf saisonnier et à ETS en backtest glissant, avec un test anti-fuite. Intervalles
   conformels à 90 %, runs et modèles suivis dans MLflow avec un alias champion.
+- **Détection d'anomalies** : score robuste sur les résidus de prévision, et
+  [étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md), un pic de six fois plus de
+  versions téléchargées, invisible sur le total.
 - **Données ouvertes** : les agrégats gold sont publiés en CSV dans la
   [release gold](../../releases/tag/gold), mis à jour par le pipeline.
 - **Qualité** : 38 tests pytest contre un faux serveur crates.io local, CI (lint, tests, dbt sur un
@@ -115,13 +118,16 @@ et de la série autres. Pour LightGBM, l'approche directe l'emporte à J+1 et l'
   téléchargements faits par cargo. Le nombre de lignes quotidiennes est divisé par 2,5 à 4, d'où un
   historique qui commence au 1er novembre 2025, dans un régime de comptage homogène.
 
+- **Le calendrier américain pèse** : les plus fortes anomalies tombent le 25 mai (Memorial Day)
+  et le 7 septembre (Labor Day). La demande suit l'intégration continue des entreprises.
+
 ## Avancement
 
 - [x] Ingestion bronze : archive, dump, jonction, données tardives
 - [x] Modèles dbt silver et gold, tests et snapshot
 - [x] Orchestration : DAG Airflow et exécution quotidienne planifiée
 - [x] Prévision J+1 et J+7 : baselines, LightGBM, backtest glissant, intervalles conformels
-- [ ] Détection d'anomalies
+- [x] Détection d'anomalies
 - [ ] Entrepôt BigQuery et infrastructure Terraform
 - [ ] API FastAPI sur Cloud Run et tableau de bord en ligne
 
@@ -136,6 +142,7 @@ make ingest    # données réelles : archive depuis le 2025-11-01, puis dump du 
 make dbt       # fraîcheur des sources, modèles silver et gold, tests et snapshot
 make backtest  # backtest glissant des références et de LightGBM, suivi dans MLflow
 make forecast  # prévisions J+1 et J+7 du modèle champion
+make anomalies # anomalies sur les résidus de prévision à J+1
 make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```
 
@@ -144,6 +151,7 @@ make airflow-test  # DAG Airflow rejoué sur sept jours avec l'échantillon
 ```text
 src/pkgpulse/ingest/   ingestion : archive, dump, jonction, contrats de schéma
 src/pkgpulse/forecast/ prévision : séries, références, LightGBM, backtest, MLflow
+src/pkgpulse/anomalies/ détection d'anomalies sur les résidus de prévision
 airflow/dags/          DAG quotidien (dépendances, relances, backfill)
 dbt/                   modèles silver et gold, tests, snapshot
 tests/                 tests pytest, avec un faux serveur crates.io
@@ -155,6 +163,8 @@ docs/                  cadrage et journal des décisions
 
 - [Cadrage](docs/cadrage.md) : séries prévues, horizons, ce que le modèle a le droit de savoir,
   métriques.
+- [Étude de cas du 21 juin 2026](docs/etude-de-cas-21-juin-2026.md) : un parcours presque complet
+  du registre, et ce que la détection d'anomalies trouve vraiment.
 - [Journal des décisions](docs/DECISIONS.md) : sources, contrats de schéma, idempotence, jonction,
   tests dbt.
 
